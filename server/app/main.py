@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from board import Board
 from Pieces.piece import Piece
+from move_generator import MoveGenerator
 
 app = FastAPI()
 
@@ -16,6 +17,7 @@ app.add_middleware(
 
 chess_board = Board()
 
+move_generator = MoveGenerator(chess_board)
 
 @app.post("/move")
 async def move(request: Request):
@@ -47,7 +49,7 @@ async def get_valid_moves(request: Request):
     if not piece or piece.color != chess_board.current_turn:
         return []
 
-    legal_moves = chess_board.get_legal_moves(piece)
+    legal_moves = move_generator.get_legal_moves(piece)
     print("Moves:", legal_moves)
 
     return [{"x": mx, "y": my} for mx, my in legal_moves]
