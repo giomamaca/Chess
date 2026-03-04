@@ -3,6 +3,7 @@ from .piece import Piece
 class Rook(Piece):
     def __init__(self, x, y, color, image):
         super().__init__(x, y, color, image)
+        self.first_move = True
 
     def get_moves(self, board) -> list[tuple[int, int]]:
         moves = []

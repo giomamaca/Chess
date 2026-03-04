@@ -1,14 +1,16 @@
-from Pieces.pawn import Pawn
-from Pieces.rook import Rook
-from Pieces.knight import Knight
-from Pieces.bishop import Bishop
-from Pieces.queen import Queen
-from Pieces.king import King
-from Pieces.piece import Piece
+from .pieces.pawn import Pawn
+from .pieces.rook import Rook
+from .pieces.knight import Knight
+from .pieces.bishop import Bishop
+from .pieces.queen import Queen
+from .pieces.king import King
 import os
 
 class Board:
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self.grid = [[None for _ in range(8)] for _ in range(8)]
         self.pieces = []
         self.setup_start_board()
@@ -30,41 +32,102 @@ class Board:
 
     def move_piece(self, piece, new_x, new_y):
         target = self.grid[new_y][new_x]
+        if "king" in piece.get_name():
+            if new_x == 6:
+                print("new_x  = 6")
+                rook = self.get_piece(7, piece.y)
+                if rook and "rook" in rook.get_name():
+                    self.grid[piece.y][7] = None
+                    rook.update_position(5, piece.y)
+                    self.grid[piece.y][5] = rook
+                    self.grid[piece.y][6] = piece
+                    self.grid[piece.y][4] = None
+                    piece.update_position(6, piece.y)
+                    return
+            if new_x == 2:
+                print("new_x = 2")
+                rook = self.get_piece(0, piece.y)
+                if rook and "rook" in rook.get_name():
+                    self.grid[piece.y][0] = None
+                    rook.update_position(3, piece.y)
+                    self.grid[piece.y][3] = rook
+                    self.grid[piece.y][2] = piece
+                    self.grid[piece.y][4] = None
+                    piece.update_position(2, piece.y)
+                    return
 
         if target is not None:
             if target in self.pieces:
                 self.pieces.remove(target)
 
         self.grid[piece.y][piece.x] = None
-
         piece.update_position(new_x, new_y)
         self.grid[new_y][new_x] = piece
+        self.current_turn = "black" if self.current_turn == "white" else "white"
+
+
+    def get_pawn_promotion_data(self):
+        if self.current_turn == "black":
+            for i in range(8):
+                piece = self.grid[0][i]
+                if piece and piece.get_name() == "white_pawn":
+                    return {
+                        "x": piece.x,
+                        "y": piece.y,
+                        "offers": [
+                            {"name": "queen",  "image": self.get_image_path("white", "queen")},
+                            {"name": "rook",   "image": self.get_image_path("white", "rook")},
+                            {"name": "bishop", "image": self.get_image_path("white", "bishop")},
+                            {"name": "knight", "image": self.get_image_path("white", "knight")},
+                        ]
+                    }
+        else:
+            for i in range(8):
+                piece = self.grid[7][i]
+                if piece and piece.get_name() == "black_pawn":
+                    return {
+                        "x": piece.x,
+                        "y": piece.y,
+                        "offers": [
+                            {"name": "queen",  "image": self.get_image_path("black", "queen")},
+                            {"name": "rook",   "image": self.get_image_path("black", "rook")},
+                            {"name": "bishop", "image": self.get_image_path("black", "bishop")},
+                            {"name": "knight", "image": self.get_image_path("black", "knight")},
+                        ]
+                    }
+        return None
+
+    def promote_pawn(self, x, y, piece_name):
+        piece = self.get_piece(x, y)
+        if not piece:
+            return
+        
+        color = piece.color
+        image = self.get_image_path(color, piece_name)
+        
+        piece_map = {
+            "queen":  Queen,
+            "rook":   Rook,
+            "bishop": Bishop,
+            "knight": Knight,
+        }
+        
+        cls = piece_map.get(piece_name)
+        if not cls:
+            return
+        
+        self.pieces.remove(piece)
+        new_piece = cls(x, y, color, image)
+        self.grid[y][x] = new_piece
+        self.pieces.append(new_piece)
+
+
 
     def get_king(self, color):
         return next((p for p in self.pieces if p.get_name() == f"{color}_king"), None)
             
     def get_enemy_color(self):
         return "white" if self.current_turn is "black" else "black"
-
-    def get_legal_moves(self, piece):
-        legal_moves = []
-
-        for x, y in piece.get_moves(self): 
-            captured = self.grid[y][x]
-            orig_x, orig_y = piece.x, piece.y
-
-            self.move_piece(piece, x, y)
-
-            king = self.get_king(piece.color)
-            if king and not self.is_square_attacked(king.x, king.y, self.get_enemy_color()):
-                legal_moves.append((x, y))
-
-            self.move_piece(piece, orig_x, orig_y)
-            self.grid[y][x] = captured
-            if captured and captured not in self.pieces:
-                self.pieces.append(captured)
-
-        return legal_moves
 
     # helper function to get image path
     def get_image_path(self, color, piece_name):

@@ -1,13 +1,13 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from board import Board
-from Pieces.piece import Piece
-from move_generator import MoveGenerator
+
+from .board import Board
+from .move_generator import MoveGenerator
+from .rules_engine import RulesEngine
 
 app = FastAPI()
 
-# Allow requests from React dev server
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,26 +16,36 @@ app.add_middleware(
 )
 
 chess_board = Board()
-
 move_generator = MoveGenerator(chess_board)
+rules_engine = RulesEngine(move_generator, chess_board)
+
+@app.get("/game-reset")
+def reset():
+    chess_board.reset()
+    return {"ok": True}
+
+@app.get("/game-status")
+def get_status():
+    return {
+        "game_state": rules_engine.get_game_state(),
+        "current_turn": chess_board.current_turn
+    }
 
 @app.post("/move")
 async def move(request: Request):
     data = await request.json()
-    name = data["name"]
     fx, fy = data["from"]
     tx, ty = data["to"]
+    piece = chess_board.get_piece(fx, fy)
 
-    print(data)
+    if piece:
+        chess_board.move_piece(piece, tx, ty)
 
-    p = chess_board.get_piece(fx, fy)
-    if p:
-        chess_board.move_piece(p, tx, ty)
-        if "pawn" in p.get_name() :
-            p.first_move = False
-        chess_board.current_turn = "black" if chess_board.current_turn == "white" else "white"
-        print_grid()
+        if any(k in piece.get_name() for k in ["pawn", "king", "rook"]):
+            piece.first_move = False
+
         return {"ok": True}
+
     return {"error": "Piece not found"}
 
 @app.post("/valid-moves")
@@ -50,10 +60,23 @@ async def get_valid_moves(request: Request):
         return []
 
     legal_moves = move_generator.get_legal_moves(piece)
-    print("Moves:", legal_moves)
-
     return [{"x": mx, "y": my} for mx, my in legal_moves]
 
+@app.get("/pawn-reached")
+def pawn_reached():
+    data = chess_board.get_pawn_promotion_data()
+    if not data:
+        return {"ok": False}
+    return {"ok": True, "data": data}
+
+@app.post("/promote")
+async def promote(request: Request):
+    data = await request.json()
+    x = data["x"]
+    y = data["y"]
+    piece_name = data["piece"]
+    chess_board.promote_pawn(x, y, piece_name)
+    return {"ok": True}
 
 @app.get("/board")
 def get_board():
