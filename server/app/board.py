@@ -64,6 +64,7 @@ class Board:
         piece.update_position(new_x, new_y)
         self.grid[new_y][new_x] = piece
         self.current_turn = "black" if self.current_turn == "white" else "white"
+        print("color changed !!!!!!!")
 
 
     def get_pawn_promotion_data(self):
@@ -170,16 +171,6 @@ class Board:
         self.place_piece(King(4, 0, "black", self.get_image_path("black", "king")))
 
     def board_to_json(self):
-        """
-        Export all pieces to a JSON-serializable list
-        Each piece includes: name, x, y, image
-        Example output:
-        [
-            {"name": "white_pawn", "x":0, "y":6, "image":"pieces/light/light_pawn_v2.png"},
-            {"name": "black_king", "x":4, "y":0, "image":"pieces/dark/dark_king_v2.png"},
-            ...
-        ]
-        """
         return [
             {
                 "name": piece.get_name(),

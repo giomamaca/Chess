@@ -43,7 +43,7 @@ async def move(request: Request):
 
         if any(k in piece.get_name() for k in ["pawn", "king", "rook"]):
             piece.first_move = False
-
+        print_grid()
         return {"ok": True}
 
     return {"error": "Piece not found"}
@@ -53,13 +53,14 @@ async def get_valid_moves(request: Request):
     data = await request.json()
     x = data.get("x")
     y = data.get("y")
-
     piece = chess_board.get_piece(x, y)
-
+    print(chess_board.current_turn)
     if not piece or piece.color != chess_board.current_turn:
         return []
 
+    print_grid()
     legal_moves = move_generator.get_legal_moves(piece)
+    #print(legal_moves)
     return [{"x": mx, "y": my} for mx, my in legal_moves]
 
 @app.get("/pawn-reached")

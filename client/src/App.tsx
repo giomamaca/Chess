@@ -354,11 +354,14 @@ export default function App() {
     try {
       const res = await fetch("http://127.0.0.1:8000/pawn-reached");
       const data = await res.json();
-      console.log(data)
 
       if (data?.ok) {
+        const hasImages = data.data?.offers?.every(
+          (offer: { image: string }) => offer.image && offer.image.trim() !== ""
+        );
+        console.log("Has images:", hasImages);
+        console.log("Offers with images:", data.data?.offers);
         setPromotionData(data.data);
-        console.log("aqaa")
       }
     } catch (err) {
       console.error("Promotion check error:", err);
@@ -403,10 +406,9 @@ export default function App() {
       const data = await res.json();
 
       if (data.ok) {
-        console.log("aqaa");
+        await refreshBoard();
         await refreshStatus();
         await checkPromotion();
-        await refreshBoard();
 
       } else {
         console.error("Move error:", data.error);
@@ -436,6 +438,7 @@ export default function App() {
 
   const handlePieceClick = (piece: Piece) => {
     setSelectedPiece(piece);
+    console.log(piece.x, piece.y)
     fetch("http://127.0.0.1:8000/valid-moves", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

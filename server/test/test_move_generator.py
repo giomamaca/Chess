@@ -45,7 +45,6 @@ def test_pinned_piece_has_restricted_moves(board):
 
     mg = MoveGenerator(board)
     moves = mg.get_legal_moves(white_rook)
-
     for x, y in moves:
         assert x == 4
 
@@ -178,3 +177,32 @@ def test_no_legal_moves_in_checkmate(board):
     mg = MoveGenerator(board)
     moves = mg.get_legal_moves(white_king)
     assert moves == []
+
+def test_only_way_is_kill_attacker(board):
+    from app.pieces.king import King
+    from app.pieces.queen import Queen
+    board.grid = [[None]*8 for _ in range(8)]
+    board.pieces = []
+
+
+    white_king = King(4, 7, "white", None)
+    white_queen = King(5, 7, "white", None)
+    black_queen1 = Queen(4, 6, "black", None)
+    black_queen2 = Queen(4, 0, "black", None)
+    
+    board.grid[7][4] = white_king
+    board.grid[7][5] = white_queen
+    board.grid[6][4] = black_queen1
+    board.grid[0][4] = black_queen2
+
+    board.pieces = [white_king, white_queen, black_queen1,  black_queen2]
+
+    mg = MoveGenerator(board)
+    king_moves = mg.get_legal_moves(white_king)
+    assert len(king_moves) == 0
+
+    queen_moves = mg.get_legal_moves(white_queen)
+    assert len(queen_moves) == 1
+
+    assert queen_moves[0] == (4, 6)
+
