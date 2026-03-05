@@ -362,6 +362,7 @@ export default function App() {
         console.log("Has images:", hasImages);
         console.log("Offers with images:", data.data?.offers);
         setPromotionData(data.data);
+
       }
     } catch (err) {
       console.error("Promotion check error:", err);
@@ -547,27 +548,27 @@ export default function App() {
 
           {/* ── PROMOTION MODAL ── */}
           {promotionData && (
-            <div className="promotion-overlay">
-              <div className="promotion-box">
-                <p className="promotion-title">Promote Pawn</p>
-                <div className="promotion-pieces">
-                  {promotionData.offers.map(offer => (
-                    <button
-                      key={offer.name}
-                      className="promotion-piece-btn"
-                      onClick={() => handlePromotion(offer.name)}
-                    >
-                      <img
-                        src={`http://127.0.0.1:8000/${offer.image}`}
-                        alt={offer.name}
-                      />
-                      <span>{offer.name}</span>
-                    </button>
-                  ))}
-                </div>
+          <div className="promotion-overlay">
+            <div className="promotion-box">
+              <div className="promotion-pieces">
+                {promotionData.offers.map(offer => (
+                  <button
+                    key={offer.name}
+                    className="promotion-piece-btn"
+                    onClick={() => handlePromotion(offer.name)}
+                  >
+                    <img
+                      src={`/${offer.image}`}
+                      alt={offer.name}
+                      width={60}
+                      height={60}
+                    />
+                  </button>
+                ))}
               </div>
             </div>
-          )}
+          </div>
+        )}
         </div>
       )}
     </>
