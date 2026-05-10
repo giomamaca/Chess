@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import ChessBoard from "./components/ChessBoard";
-import { Console } from "console";
+import LogRegistration from "./components/LoginRegistration";
+import GameScreen from "./components/GameScreen";
+import MenuScreen from "./components/MenuScreen";
+import ModeSelectScreen from "./components/ModeSelection";
 
 export type Piece = {
   name: string;
@@ -15,6 +18,13 @@ type OnlineMode = "online" | "offline";
 
 type PromotionOffer = { name: string; image: string };
 type PromotionData = { x: number; y: number; color: string; offers: PromotionOffer[] };
+
+const BASE_URL = "https://contributive-flockiest-henrietta.ngrok-free.dev";
+
+const HEADERS = {
+  "Content-Type": "application/json",
+  "ngrok-skip-browser-warning": "true",
+};
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
@@ -321,11 +331,11 @@ const styles = `
 export default function App() {
   const [screen, setScreen] = useState<Screen>("menu");
   const [onlineMode, setOnlineMode] = useState<OnlineMode | null>(null);
-
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
   const [validMoves, setValidMoves] = useState<Move[]>([]);
   const [promotionData, setPromotionData] = useState<PromotionData | null>(null);
+  const [loggedIn, setLoggedIn] = useState<boolean>(false);
   const [gameState, setGameState] = useState<{
     game_state: "ongoing" | "checkmate" | "stalemate";
     current_turn: "white" | "black";
@@ -333,7 +343,7 @@ export default function App() {
 
   useEffect(() => {
     if (screen === "game") {
-      fetch("http://localhost:8000/board")
+      fetch(`${BASE_URL}/board`, { headers: HEADERS })
         .then(res => res.json())
         .then(setPieces)
         .catch(err => console.error("Fetch error:", err));
@@ -341,28 +351,22 @@ export default function App() {
   }, [screen]);
 
   const refreshBoard = () =>
-    fetch("http://127.0.0.1:8000/board")
+    fetch(`${BASE_URL}/board`, { headers: HEADERS })
       .then(res => res.json())
       .then(board => setPieces(board));
 
   const refreshStatus = () =>
-    fetch("http://127.0.0.1:8000/game-status")
+    fetch(`${BASE_URL}/game-status`, { headers: HEADERS })
       .then(res => res.json())
       .then(status => setGameState(status));
 
   const checkPromotion = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/pawn-reached");
+      const res = await fetch(`${BASE_URL}/pawn-reached`, { headers: HEADERS });
       const data = await res.json();
-
       if (data?.ok) {
-        const hasImages = data.data?.offers?.every(
-          (offer: { image: string }) => offer.image && offer.image.trim() !== ""
-        );
-        console.log("Has images:", hasImages);
         console.log("Offers with images:", data.data?.offers);
         setPromotionData(data.data);
-
       }
     } catch (err) {
       console.error("Promotion check error:", err);
@@ -372,12 +376,9 @@ export default function App() {
   const handleSquareClick = async (row: number, col: number) => {
     if (!selectedPiece) return;
 
-    const isValid = validMoves.some(
-      move => move.x === col && move.y === row
-    );
+    const isValid = validMoves.some(move => move.x === col && move.y === row);
     if (!isValid) return;
 
-    // Optimistic UI update (keep your logic)
     setPieces(prev =>
       prev
         .filter(p => !(p.x === col && p.y === row))
@@ -394,9 +395,9 @@ export default function App() {
     setValidMoves([]);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/move", {
+      const res = await fetch(`${BASE_URL}/move`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: HEADERS,
         body: JSON.stringify({
           name: selectedPiece.name,
           from: [selectedPiece.x, selectedPiece.y],
@@ -410,23 +411,21 @@ export default function App() {
         await refreshBoard();
         await refreshStatus();
         await checkPromotion();
-
       } else {
         console.error("Move error:", data.error);
         await refreshBoard();
       }
-
     } catch (err) {
       console.error("Move request failed:", err);
     }
   };
-  
+
   const handlePromotion = (pieceName: string) => {
     if (!promotionData) return;
 
-    fetch("http://127.0.0.1:8000/promote", {
+    fetch(`${BASE_URL}/promote`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: HEADERS,
       body: JSON.stringify({ x: promotionData.x, y: promotionData.y, piece: pieceName }),
     })
       .then(res => res.json())
@@ -439,10 +438,9 @@ export default function App() {
 
   const handlePieceClick = (piece: Piece) => {
     setSelectedPiece(piece);
-    console.log(piece.x, piece.y)
-    fetch("http://127.0.0.1:8000/valid-moves", {
+    fetch(`${BASE_URL}/valid-moves`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: HEADERS,
       body: JSON.stringify(piece),
     })
       .then(res => res.json())
@@ -451,7 +449,7 @@ export default function App() {
   };
 
   const handleReset = () => {
-    fetch("http://127.0.0.1:8000/game-reset")
+    fetch(`${BASE_URL}/game-reset`, { headers: HEADERS })
       .then(res => res.json())
       .then(data => {
         if (data === null || data?.ok === undefined || data?.ok) {
@@ -476,100 +474,46 @@ export default function App() {
     }
   };
 
+  if (!loggedIn) {
+    return <LogRegistration setLoggedIn={setLoggedIn} styles={styles} />;
+  }
+
   return (
     <>
       <style>{styles}</style>
 
-      {/* ── MAIN MENU ── */}
       {screen === "menu" && (
-        <div className="menu-root fade-in">
-          <div className="chess-crown">♛</div>
-          <h1 className="game-title">REGICIDE</h1>
-          <p className="game-subtitle">A Chess Experience</p>
-          <div className="divider" />
-          <div className="btn-group">
-            <button className="btn btn-primary" onClick={() => { setOnlineMode("offline"); setScreen("mode-select"); }}>
-              Offline
-            </button>
-            <button className="btn btn-disabled" disabled>
-              Online <span className="coming-soon-badge">Soon</span>
-            </button>
-          </div>
-        </div>
+        <MenuScreen
+          setScreen={setScreen}
+          setOnlineMode={setOnlineMode}
+          setLoggedIn={setLoggedIn}
+        />
       )}
-
-      {/* ── MODE SELECT ── */}
       {screen === "mode-select" && onlineMode === "offline" && (
-        <div className="menu-root fade-in">
-          <div className="chess-crown" style={{ fontSize: "2.5rem" }}>♞</div>
-          <p className="mode-label">Choose Your Battle</p>
-          <p className="mode-desc">Offline Mode</p>
-          <div className="divider" />
-          <div className="btn-group horizontal">
-            <button className="btn btn-primary" onClick={() => setScreen("game")}>1 v 1</button>
-            <button className="btn btn-disabled" disabled>
-              vs AI <span className="coming-soon-badge">Soon</span>
-            </button>
-          </div>
-          <button className="btn-back" onClick={handleBack}>← Back</button>
-        </div>
+        <ModeSelectScreen
+          setScreen={setScreen}
+          handleBack={handleBack}
+        />
       )}
 
-      {/* ── GAME ── */}
       {screen === "game" && (
-        <div className="game-root fade-in">
-          <div className="game-header">
-            <div>
-              <div className="game-header-title">REGICIDE</div>
-              <div className="game-header-mode">Offline · 1v1</div>
-            </div>
-            <button className="btn btn-secondary" style={{ padding: "0.5rem 1.2rem", fontSize: "0.75rem" }} onClick={handleBack}>
-              ← Menu
-            </button>
-          </div>
-
-          <ChessBoard
-            pieces={pieces}
-            selectedPiece={selectedPiece}
-            validMoves={validMoves}
-            onSquareClick={handleSquareClick}
-            onPieceClick={handlePieceClick}
-          />
-
-          {selectedPiece && (
-            <p className="selected-info">Selected: {selectedPiece.name}</p>
-          )}
-
-          {(gameState.game_state === "checkmate" || gameState.game_state === "stalemate") && (
-            <button className="btn btn-primary" style={{ marginTop: "1rem" }} onClick={handleReset}>
-              Reset Game
-            </button>
-          )}
-
-          {/* ── PROMOTION MODAL ── */}
-          {promotionData && (
-          <div className="promotion-overlay">
-            <div className="promotion-box">
-              <div className="promotion-pieces">
-                {promotionData.offers.map(offer => (
-                  <button
-                    key={offer.name}
-                    className="promotion-piece-btn"
-                    onClick={() => handlePromotion(offer.name)}
-                  >
-                    <img
-                      src={`/${offer.image}`}
-                      alt={offer.name}
-                      width={60}
-                      height={60}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        </div>
+        <GameScreen
+          pieces={pieces}
+          selectedPiece={selectedPiece}
+          validMoves={validMoves}
+          gameState={gameState}
+          promotionData={promotionData}
+          handleBack={handleBack}
+          handleSquareClick={handleSquareClick}
+          handlePieceClick={handlePieceClick}
+          handlePromotion={handlePromotion}
+          handleReset={handleReset}
+          setLoggedIn={setLoggedIn}
+          setScreen={setScreen}
+          setPieces={setPieces}
+          setSelectedPiece={setSelectedPiece}
+          setValidMoves={setValidMoves}
+        />
       )}
     </>
   );

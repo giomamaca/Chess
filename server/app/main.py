@@ -1,12 +1,25 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from .board import Board
 from .move_generator import MoveGenerator
 from .rules_engine import RulesEngine
 
+from db.auth_service import AuthService
+from db.database_classes.user_account import UserAccount
+
+
 app = FastAPI()
+chess_board = Board()
+move_generator = MoveGenerator(chess_board)
+rules_engine = RulesEngine(move_generator, chess_board)
+auth = AuthService()
+
+sockets = []
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,9 +28,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-chess_board = Board()
-move_generator = MoveGenerator(chess_board)
-rules_engine = RulesEngine(move_generator, chess_board)
 
 @app.get("/game-reset")
 def reset():
@@ -60,7 +70,6 @@ async def get_valid_moves(request: Request):
 
     print_grid()
     legal_moves = move_generator.get_legal_moves(piece)
-    #print(legal_moves)
     return [{"x": mx, "y": my} for mx, my in legal_moves]
 
 @app.get("/pawn-reached")
@@ -83,6 +92,14 @@ async def promote(request: Request):
 def get_board():
     return JSONResponse(chess_board.board_to_json())
 
+@app.post("/account-login")
+def account_login(userAccount : UserAccount):
+    user = auth.login(userAccount.username, userAccount.password)
+    return {"ok" : True} if user else {"ok": False}
+
+@app.post("/account-register")
+def account_register(userAccount : UserAccount):
+    return auth.register(userAccount.username, userAccount.password)
 
 def print_grid():
     grd = chess_board.grid
@@ -97,3 +114,24 @@ def print_grid():
                 short_name = parts[0][0] + parts[1][:2]
                 print(short_name, end=" ")
         print()
+
+# @app.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await websocket.accept()
+#     sockets.append(websocket)
+    
+#     try:
+#         while True:
+#             pass
+
+#     except WebSocketDisconnect:
+#         pass
+
+
+
+app.mount("/static", StaticFiles(directory="D:/Chess/client/build/static"), name="static")
+app.mount("/pieces", StaticFiles(directory="D:/Chess/client/build/pieces"), name="pieces")
+
+@app.get("/")
+def serve_react():
+    return FileResponse("D:/Chess/client/build/index.html")

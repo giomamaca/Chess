@@ -8,10 +8,10 @@ interface Props {
 export default function PieceComponent({ piece, onClick }: Props) {
   return (
     <img
-      src={piece.image}
+      src={`${process.env.PUBLIC_URL}/${piece.image}`}
       alt={piece.name}
       draggable={false}
-      onClick={onClick} // use onClick instead of onMouseDown for better UX
+      onClick={onClick}
       style={{
         width: "90%",
         height: "90%",

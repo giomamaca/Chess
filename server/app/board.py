@@ -4,6 +4,7 @@ from .pieces.knight import Knight
 from .pieces.bishop import Bishop
 from .pieces.queen import Queen
 from .pieces.king import King
+import random
 import os
 
 class Board:
@@ -64,7 +65,6 @@ class Board:
         piece.update_position(new_x, new_y)
         self.grid[new_y][new_x] = piece
         self.current_turn = "black" if self.current_turn == "white" else "white"
-        print("color changed !!!!!!!")
 
 
     def get_pawn_promotion_data(self):
@@ -128,7 +128,7 @@ class Board:
         return next((p for p in self.pieces if p.get_name() == f"{color}_king"), None)
             
     def get_enemy_color(self):
-        return "white" if self.current_turn is "black" else "black"
+        return "white" if self.current_turn == "black" else "black"
 
     # helper function to get image path
     def get_image_path(self, color, piece_name):

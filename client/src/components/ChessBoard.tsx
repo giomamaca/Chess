@@ -53,9 +53,9 @@ export default function ChessBoard({
                 y={row}
                 piece={piece}
                 isSelected={selected}
-                isValidMove={isValidMove(col, row)}  //highlight support
+                isValidMove={isValidMove(col, row)}
                 onClick={() => onSquareClick?.(row, col)}
-                onPieceClick={onPieceClick}         //correct prop
+                onPieceClick={onPieceClick}
               />
             );
           })
