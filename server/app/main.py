@@ -95,7 +95,7 @@ def get_board():
 @app.post("/account-login")
 def account_login(userAccount : UserAccount):
     user = auth.login(userAccount.username, userAccount.password)
-    return {"ok" : True} if user else {"ok": False}
+    return user
 
 @app.post("/account-register")
 def account_register(userAccount : UserAccount):
@@ -115,19 +115,19 @@ def print_grid():
                 print(short_name, end=" ")
         print()
 
-# @app.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websocket.accept()
-#     sockets.append(websocket)
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    sockets.append(websocket)
     
-#     try:
-#         while True:
-#             pass
 
-#     except WebSocketDisconnect:
-#         pass
+    try:
+        while True:
+            pass
 
-
+    except WebSocketDisconnect:
+        pass
+        
 
 app.mount("/static", StaticFiles(directory="D:/Chess/client/build/static"), name="static")
 app.mount("/pieces", StaticFiles(directory="D:/Chess/client/build/pieces"), name="pieces")

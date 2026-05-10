@@ -42,7 +42,6 @@ export default function Square({
         border: "1px solid black",
       }}
     >
-      {/* Dot indicator for empty valid move squares */}
       {isValidMove && !piece && (
         <div
           style={{
@@ -55,12 +54,9 @@ export default function Square({
         />
       )}
 
-      {/* Piece rendering */}
       {piece && (
         <PieceComponent
           piece={piece}
-          // If the square is a valid move (i.e., enemy piece), clicking moves
-          // Otherwise, clicking selects the piece
           onClick={isValidMove ? onClick! : () => onPieceClick?.(piece)}
         />
       )}

@@ -1,13 +1,18 @@
-type Screen = "menu" | "mode-select" | "game";
-type OnlineMode = "online" | "offline";
+type Screen =
+  | "registration"
+  | "menu"
+  | "offline-select"
+  | "online-select"
+  | "online-lobby"
+  | "online-join"
+  | "game";
 
 interface Props {
   setScreen: (screen: Screen) => void;
-  setOnlineMode: (mode: OnlineMode) => void;
   setLoggedIn: (value: boolean) => void;
 }
 
-export default function MenuScreen({ setScreen, setOnlineMode, setLoggedIn }: Props) {
+export default function MenuScreen({ setScreen, setLoggedIn }: Props) {
   return (
     <div className="menu-root fade-in">
       <div style={{ position: "absolute", top: "1.5rem", right: "1.5rem" }}>
@@ -26,12 +31,15 @@ export default function MenuScreen({ setScreen, setOnlineMode, setLoggedIn }: Pr
       <div className="btn-group">
         <button
           className="btn btn-primary"
-          onClick={() => { setOnlineMode("offline"); setScreen("mode-select"); }}
+          onClick={() => setScreen("offline-select")}
         >
           Offline
         </button>
-        <button className="btn btn-disabled" disabled>
-          Online <span className="coming-soon-badge">Soon</span>
+        <button
+          className="btn btn-primary"
+          onClick={() => setScreen("online-select")}
+        >
+          Online
         </button>
       </div>
     </div>

@@ -5,6 +5,15 @@ type Move = { x: number; y: number };
 type PromotionOffer = { name: string; image: string };
 type PromotionData = { x: number; y: number; color: string; offers: PromotionOffer[] };
 
+type Screen =
+  | "registration"
+  | "menu"
+  | "offline-select"
+  | "online-select"
+  | "online-lobby"
+  | "online-join"
+  | "game";
+
 interface Props {
   pieces: Piece[];
   selectedPiece: Piece | null;
@@ -20,7 +29,7 @@ interface Props {
   handlePromotion: (pieceName: string) => void;
   handleReset: () => void;
   setLoggedIn: (value: boolean) => void;
-  setScreen: (screen: "menu" | "mode-select" | "game") => void;
+  setScreen: (screen: Screen) => void;
   setPieces: (pieces: Piece[]) => void;
   setSelectedPiece: (piece: Piece | null) => void;
   setValidMoves: (moves: Move[]) => void;
@@ -63,13 +72,13 @@ export default function GameScreen({
             style={{ padding: "0.5rem 1.2rem", fontSize: "0.75rem", borderColor: "#8b3a3a", color: "#c0392b" }}
             onClick={() => {
               setLoggedIn(false);
-              setScreen("menu");
+              setScreen("registration");
               setPieces([]);
               setSelectedPiece(null);
               setValidMoves([]);
             }}
           >
-            Leave
+            Sign Out
           </button>
         </div>
       </div>

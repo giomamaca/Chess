@@ -1,12 +1,16 @@
 import { useState } from "react";
 
+type Screen = "registration" | "menu" | "offline-select" | "online-select" | "online-lobby" | "online-join" | "game";
+
 interface Props {
   setLoggedIn: (value: boolean) => void;
+  setScreen: (screen: Screen) => void;
+  connectWebSocket: (username: string) => void;
   styles: string;
 }
 
-export default function LogRegistration({ setLoggedIn, styles }: Props) {
-  const [screen, setScreen] = useState<"login" | "register">("login");
+export default function LogRegistration({ setLoggedIn, setScreen, connectWebSocket, styles }: Props) {
+  const [authScreen, setAuthScreen] = useState<"login" | "register">("login");
   const [form, setForm] = useState({ username: "", password: "", confirm: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -88,6 +92,7 @@ export default function LogRegistration({ setLoggedIn, styles }: Props) {
       font-family: 'Crimson Text', serif;
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
+      box-sizing: border-box;
     }
     .auth-input::placeholder { color: #333; }
     .auth-input:focus {
@@ -128,12 +133,15 @@ export default function LogRegistration({ setLoggedIn, styles }: Props) {
     }
   `;
 
-  const handleDataResult = async (api: string): Promise<boolean> => {
+  const handleDataResult = async (api: string) => {
     const res = await fetch(
       `https://contributive-flockiest-henrietta.ngrok-free.dev/${api}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
         body: JSON.stringify({
           username: form.username,
           password: form.password,
@@ -153,17 +161,19 @@ export default function LogRegistration({ setLoggedIn, styles }: Props) {
       setError("All fields are required.");
       return;
     }
-    if (screen === "register" && form.password !== form.confirm) {
+    if (authScreen === "register" && form.password !== form.confirm) {
       setError("Passwords do not match.");
       return;
     }
 
     setLoading(true);
     try {
-      const api = screen === "login" ? "account-login" : "account-register";
-      const data = await handleDataResult(api);  
+      const api = authScreen === "login" ? "account-login" : "account-register";
+      const data = await handleDataResult(api);
       if (data) {
+        connectWebSocket(form.username);
         setLoggedIn(true);
+        setScreen("menu");
       } else {
         setError("Invalid credentials. Please try again.");
         setForm({ username: "", password: "", confirm: "" });
@@ -176,7 +186,7 @@ export default function LogRegistration({ setLoggedIn, styles }: Props) {
   };
 
   const switchScreen = (s: "login" | "register") => {
-    setScreen(s);
+    setAuthScreen(s);
     setError("");
     setForm({ username: "", password: "", confirm: "" });
   };
@@ -195,13 +205,13 @@ export default function LogRegistration({ setLoggedIn, styles }: Props) {
         <div className="auth-card">
           <div className="auth-tabs">
             <button
-              className={`auth-tab ${screen === "login" ? "active" : ""}`}
+              className={`auth-tab ${authScreen === "login" ? "active" : ""}`}
               onClick={() => switchScreen("login")}
             >
               Sign In
             </button>
             <button
-              className={`auth-tab ${screen === "register" ? "active" : ""}`}
+              className={`auth-tab ${authScreen === "register" ? "active" : ""}`}
               onClick={() => switchScreen("register")}
             >
               Register
@@ -231,7 +241,7 @@ export default function LogRegistration({ setLoggedIn, styles }: Props) {
               />
             </div>
 
-            {screen === "register" && (
+            {authScreen === "register" && (
               <div className="auth-field">
                 <label className="auth-label">Confirm Password</label>
                 <input
@@ -252,13 +262,13 @@ export default function LogRegistration({ setLoggedIn, styles }: Props) {
               disabled={loading}
               style={{ width: "100%", textAlign: "center" }}
             >
-              {loading ? "…" : screen === "login" ? "Enter the Board" : "Create Account"}
+              {loading ? "…" : authScreen === "login" ? "Enter the Board" : "Create Account"}
             </button>
           </form>
 
           <hr className="auth-divider" />
           <p className="auth-switch">
-            {screen === "login" ? (
+            {authScreen === "login" ? (
               <>No account?{" "}
                 <button onClick={() => switchScreen("register")}>Register here</button>
               </>

@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
-import ChessBoard from "./components/ChessBoard";
+import { useEffect, useRef, useState } from "react";
 import LogRegistration from "./components/LoginRegistration";
 import GameScreen from "./components/GameScreen";
 import MenuScreen from "./components/MenuScreen";
-import ModeSelectScreen from "./components/ModeSelection";
+import OfflineSelectScreen from "./components/OfflineSelectScreen";
+import OnlineSelectScreen from "./components/OnlineSelectScreen";
+// import OnlineLobbyScreen from "./components/OnlineLobbyScreen";
+// import OnlineJoinScreen from "./components/OnlineJoinScreen";
 
 export type Piece = {
   name: string;
@@ -13,8 +15,14 @@ export type Piece = {
 };
 
 type Move = { x: number; y: number };
-type Screen = "menu" | "mode-select" | "game";
-type OnlineMode = "online" | "offline";
+type Screen =
+  | "registration"
+  | "menu"
+  | "offline-select"
+  | "online-select"
+  | "online-lobby"
+  | "online-join"
+  | "game";
 
 type PromotionOffer = { name: string; image: string };
 type PromotionData = { x: number; y: number; color: string; offers: PromotionOffer[] };
@@ -329,8 +337,8 @@ const styles = `
 `;
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("menu");
-  const [onlineMode, setOnlineMode] = useState<OnlineMode | null>(null);
+  const ws = useRef<WebSocket | null>(null);
+  const [screen, setScreen] = useState<Screen>("registration");
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
   const [validMoves, setValidMoves] = useState<Move[]>([]);
@@ -350,6 +358,28 @@ export default function App() {
     }
   }, [screen]);
 
+  const connectWebSocket = (username: string) => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) return;
+
+    const socket = new WebSocket(`${BASE_URL.replace("https", "wss")}/ws`);
+    ws.current = socket;
+
+    socket.onopen = () => socket.send(username);
+
+    socket.onmessage = (event: MessageEvent) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "game_start") setScreen("game");
+    };
+
+    socket.onclose = () => {
+      console.log("Disconnected");
+      setTimeout(() => {
+        const savedName = localStorage.getItem("name");
+        if (savedName) connectWebSocket(savedName);
+      }, 2000);
+    };
+  };
+
   const refreshBoard = () =>
     fetch(`${BASE_URL}/board`, { headers: HEADERS })
       .then(res => res.json())
@@ -364,10 +394,7 @@ export default function App() {
     try {
       const res = await fetch(`${BASE_URL}/pawn-reached`, { headers: HEADERS });
       const data = await res.json();
-      if (data?.ok) {
-        console.log("Offers with images:", data.data?.offers);
-        setPromotionData(data.data);
-      }
+      if (data?.ok) setPromotionData(data.data);
     } catch (err) {
       console.error("Promotion check error:", err);
     }
@@ -404,13 +431,9 @@ export default function App() {
           to: [col, row],
         }),
       });
-
       const data = await res.json();
-
       if (data.ok) {
-        await refreshBoard();
-        await refreshStatus();
-        await checkPromotion();
+        await Promise.all([refreshBoard(), refreshStatus(), checkPromotion()]);
       } else {
         console.error("Move error:", data.error);
         await refreshBoard();
@@ -422,17 +445,13 @@ export default function App() {
 
   const handlePromotion = (pieceName: string) => {
     if (!promotionData) return;
-
     fetch(`${BASE_URL}/promote`, {
       method: "POST",
       headers: HEADERS,
       body: JSON.stringify({ x: promotionData.x, y: promotionData.y, piece: pieceName }),
     })
       .then(res => res.json())
-      .then(() => {
-        setPromotionData(null);
-        refreshBoard();
-      })
+      .then(() => { setPromotionData(null); refreshBoard(); })
       .catch(err => console.error("Promotion failed:", err));
   };
 
@@ -464,18 +483,29 @@ export default function App() {
 
   const handleBack = () => {
     if (screen === "game") {
-      setScreen("mode-select");
+      setScreen("offline-select");
       setPieces([]);
       setSelectedPiece(null);
       setValidMoves([]);
-    } else if (screen === "mode-select") {
-      setOnlineMode(null);
+    } else if (screen === "offline-select" || screen === "online-select") {
       setScreen("menu");
+    } else if (screen === "online-lobby" || screen === "online-join") {
+      setScreen("online-select");
+    } else if (screen === "menu") {
+      setLoggedIn(false);
+      setScreen("registration");
     }
   };
 
   if (!loggedIn) {
-    return <LogRegistration setLoggedIn={setLoggedIn} styles={styles} />;
+    return (
+      <LogRegistration
+        setLoggedIn={setLoggedIn}
+        setScreen={setScreen}
+        connectWebSocket={connectWebSocket}
+        styles={styles}
+      />
+    );
   }
 
   return (
@@ -485,16 +515,39 @@ export default function App() {
       {screen === "menu" && (
         <MenuScreen
           setScreen={setScreen}
-          setOnlineMode={setOnlineMode}
           setLoggedIn={setLoggedIn}
         />
       )}
-      {screen === "mode-select" && onlineMode === "offline" && (
-        <ModeSelectScreen
+
+      {screen === "offline-select" && (
+        <OfflineSelectScreen
           setScreen={setScreen}
           handleBack={handleBack}
         />
       )}
+
+      {screen === "online-select" && (
+        <OnlineSelectScreen
+          setScreen={setScreen}
+          handleBack={handleBack}
+        />
+      )}
+
+      {/* {screen === "online-lobby" && (
+        <OnlineLobbyScreen
+          setScreen={setScreen}
+          handleBack={handleBack}
+          ws={ws.current}
+        />
+      )}
+
+      {screen === "online-join" && (
+        <OnlineJoinScreen
+          setScreen={setScreen}
+          handleBack={handleBack}
+          ws={ws.current}
+        />
+      )} */}
 
       {screen === "game" && (
         <GameScreen
