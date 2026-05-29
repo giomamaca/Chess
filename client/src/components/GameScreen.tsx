@@ -1,18 +1,11 @@
 import ChessBoard from "./ChessBoard";
 import { Piece } from "../App";
+import { Screen } from "../types";
 
 type Move = { x: number; y: number };
 type PromotionOffer = { name: string; image: string };
 type PromotionData = { x: number; y: number; color: string; offers: PromotionOffer[] };
 
-type Screen =
-  | "registration"
-  | "menu"
-  | "offline-select"
-  | "online-select"
-  | "online-lobby"
-  | "online-join"
-  | "game";
 
 interface Props {
   pieces: Piece[];

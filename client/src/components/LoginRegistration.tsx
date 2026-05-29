@@ -1,15 +1,14 @@
 import { useState } from "react";
-
-type Screen = "registration" | "menu" | "offline-select" | "online-select" | "online-lobby" | "online-join" | "game";
+import BASE_URL from "../config";
+import {Screen} from "../types"
 
 interface Props {
   setLoggedIn: (value: boolean) => void;
   setScreen: (screen: Screen) => void;
-  connectWebSocket: (username: string) => void;
   styles: string;
 }
 
-export default function LogRegistration({ setLoggedIn, setScreen, connectWebSocket, styles }: Props) {
+export default function LogRegistration({ setLoggedIn, setScreen, styles }: Props) {
   const [authScreen, setAuthScreen] = useState<"login" | "register">("login");
   const [form, setForm] = useState({ username: "", password: "", confirm: "" });
   const [error, setError] = useState("");
@@ -135,7 +134,7 @@ export default function LogRegistration({ setLoggedIn, setScreen, connectWebSock
 
   const handleDataResult = async (api: string) => {
     const res = await fetch(
-      `https://contributive-flockiest-henrietta.ngrok-free.dev/${api}`,
+      `${BASE_URL}/${api}`,
       {
         method: "POST",
         headers: {
@@ -171,7 +170,7 @@ export default function LogRegistration({ setLoggedIn, setScreen, connectWebSock
       const api = authScreen === "login" ? "account-login" : "account-register";
       const data = await handleDataResult(api);
       if (data) {
-        connectWebSocket(form.username);
+        localStorage.setItem("name", form.username);
         setLoggedIn(true);
         setScreen("menu");
       } else {

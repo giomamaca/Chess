@@ -1,0 +1,175 @@
+import os
+import random
+import string
+from db.session import get_connection
+from db.init_db import init_db
+
+
+def generate_code(length=8) -> str:
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+
+class GameRepository:
+    def __init__(self):
+        init_db()
+
+    def create_game(self, white_player_id: int, black_player_id: int) -> int:
+        conn = get_connection()
+        cur = conn.cursor()
+        code = generate_code()
+        cur.execute("""
+            INSERT INTO games (
+                code, white_player_id, black_player_id,
+                current_turn, status
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+        """, (code, white_player_id, black_player_id, "white", "active"))
+        game_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+        return game_id
+
+    def create_open_game(self, player_id: int) -> tuple:
+        """Create a quick match game with random color assignment."""
+        conn = get_connection()
+        cur = conn.cursor()
+        code = generate_code()
+
+        if random.choice([True, False]):
+            white_id = player_id
+            black_id = None
+        else:
+            white_id = None
+            black_id = player_id
+
+        cur.execute("""
+            INSERT INTO games (
+                code, white_player_id, black_player_id,
+                current_turn, status
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+        """, (code, white_id, black_id, "white", "waiting"))
+
+        game_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+        return game_id, code
+
+    def create_private_room(self, player_id: int) -> str:
+        """Create a private room with random color assignment. Returns room code."""
+        conn = get_connection()
+        cur = conn.cursor()
+        code = generate_code(6)
+
+        if random.choice([True, False]):
+            white_id = player_id
+            black_id = None
+        else:
+            white_id = None
+            black_id = player_id
+
+        cur.execute("""
+            INSERT INTO games (
+                code, white_player_id, black_player_id,
+                current_turn, status
+            )
+            VALUES (%s, %s, %s, %s, %s)
+        """, (code, white_id, black_id, "white", "private"))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return code
+
+    def join_private_room(self, code: str, player_id: int):
+        """Join a private room by code. Returns (game_id, host_id, host_color) or None."""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE games
+            SET
+                white_player_id = CASE WHEN white_player_id IS NULL THEN %s ELSE white_player_id END,
+                black_player_id = CASE WHEN black_player_id IS NULL THEN %s ELSE black_player_id END,
+                status = 'active'
+            WHERE code = %s AND status = 'private'
+              AND (white_player_id IS NULL OR black_player_id IS NULL)
+            RETURNING id, white_player_id, black_player_id
+        """, (player_id, player_id, code))
+        result = cur.fetchone()
+        conn.commit()
+        cur.close()
+        conn.close()
+        if not result:
+            return None
+        game_id, white_id, black_id = result
+        host_id = white_id if black_id == player_id else black_id
+        joining_color = "black" if black_id == player_id else "white"
+        host_color = "white" if joining_color == "black" else "black"
+        return game_id, host_id, joining_color, host_color
+
+    def get_free_lobby(self, player_id: int):
+        """Find the oldest waiting quick match game not hosted by this player."""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, white_player_id, black_player_id, code
+            FROM games
+            WHERE status = 'waiting'
+              AND (white_player_id IS NULL OR black_player_id IS NULL)
+              AND (white_player_id != %s OR white_player_id IS NULL)
+              AND (black_player_id != %s OR black_player_id IS NULL)
+            ORDER BY created_at ASC
+            LIMIT 1
+        """, (player_id, player_id))
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result
+
+    def join_lobby(self, game_id: int, player_id: int) -> tuple:
+        """Fill the open slot in a quick match game."""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE games
+            SET
+                white_player_id = CASE WHEN white_player_id IS NULL THEN %s ELSE white_player_id END,
+                black_player_id = CASE WHEN black_player_id IS NULL THEN %s ELSE black_player_id END,
+                status = 'active'
+            WHERE id = %s
+            RETURNING white_player_id, black_player_id, code
+        """, (player_id, player_id, game_id))
+        result = cur.fetchone()
+        conn.commit()
+        cur.close()
+        conn.close()
+        return result
+
+    def get_game(self, game_id: int):
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, code, white_player_id, black_player_id,
+                   current_turn, status
+            FROM games WHERE id = %s
+        """, (game_id,))
+        game = cur.fetchone()
+        cur.close()
+        conn.close()
+        return game
+
+    def get_game_by_code(self, code: str):
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, code, white_player_id, black_player_id,
+                   current_turn, status
+            FROM games WHERE code = %s
+        """, (code,))
+        game = cur.fetchone()
+        cur.close()
+        conn.close()
+        return game

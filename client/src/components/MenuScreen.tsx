@@ -1,11 +1,4 @@
-type Screen =
-  | "registration"
-  | "menu"
-  | "offline-select"
-  | "online-select"
-  | "online-lobby"
-  | "online-join"
-  | "game";
+import { Screen } from "../types";
 
 interface Props {
   setScreen: (screen: Screen) => void;
@@ -31,13 +24,13 @@ export default function MenuScreen({ setScreen, setLoggedIn }: Props) {
       <div className="btn-group">
         <button
           className="btn btn-primary"
-          onClick={() => setScreen("offline-select")}
+          onClick={() => setScreen("offline-setup")}
         >
           Offline
         </button>
         <button
           className="btn btn-primary"
-          onClick={() => setScreen("online-select")}
+          onClick={() => setScreen("online-setup")}
         >
           Online
         </button>

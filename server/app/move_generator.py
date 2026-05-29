@@ -56,7 +56,7 @@ class MoveGenerator:
 
     def get_casting_moves(self, king):
         moves = []
-
+        
         if not king.first_move:
             return moves
 

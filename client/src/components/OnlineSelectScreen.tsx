@@ -1,11 +1,4 @@
-type Screen =
-  | "registration"
-  | "menu"
-  | "offline-select"
-  | "online-select"
-  | "online-lobby"
-  | "online-join"
-  | "game";
+import { Screen } from "../types";
 
 interface Props {
   setScreen: (screen: Screen) => void;
@@ -20,16 +13,10 @@ export default function OnlineSelectScreen({ setScreen, handleBack }: Props) {
       <p className="mode-desc">How do you want to play?</p>
       <div className="divider" />
       <div className="btn-group">
-        <button
-          className="btn btn-primary"
-          onClick={() => setScreen("online-lobby")}
-        >
+        <button className="btn btn-primary" onClick={() => setScreen("online-private")}>
           Private Lobby
         </button>
-        <button
-          className="btn btn-primary"
-          onClick={() => setScreen("online-join")}
-        >
+        <button className="btn btn-primary" onClick={() => setScreen("online-quick-match")}>
           Quick Match
         </button>
       </div>

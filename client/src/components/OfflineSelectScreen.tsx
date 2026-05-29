@@ -1,12 +1,5 @@
-type Screen =
-  | "registration"
-  | "menu"
-  | "offline-select"
-  | "online-select"
-  | "online-lobby"
-  | "online-join"
-  | "game";
-
+import { Screen } from "../types";
+  
 interface Props {
   setScreen: (screen: Screen) => void;
   handleBack: () => void;

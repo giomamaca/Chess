@@ -33,11 +33,11 @@ class Board:
 
     def move_piece(self, piece, new_x, new_y):
         target = self.grid[new_y][new_x]
-        if "king" in piece.get_name():
+        if "king" in piece.get_name() and piece.first_move:
             if new_x == 6:
                 print("new_x  = 6")
                 rook = self.get_piece(7, piece.y)
-                if rook and "rook" in rook.get_name():
+                if rook and "rook" in rook.get_name() and rook.first_move:
                     self.grid[piece.y][7] = None
                     rook.update_position(5, piece.y)
                     self.grid[piece.y][5] = rook
@@ -45,7 +45,7 @@ class Board:
                     self.grid[piece.y][4] = None
                     piece.update_position(6, piece.y)
                     return
-            if new_x == 2:
+            if new_x == 2 and rook.first_move:
                 print("new_x = 2")
                 rook = self.get_piece(0, piece.y)
                 if rook and "rook" in rook.get_name():
@@ -59,6 +59,8 @@ class Board:
 
         if target is not None:
             if target in self.pieces:
+                print(new_x, new_y)
+                print(target.get_name())
                 self.pieces.remove(target)
 
         self.grid[piece.y][piece.x] = None
@@ -181,6 +183,40 @@ class Board:
             for piece in self.pieces
         ]
     
+    @classmethod
+    def board_from_json(cls, data):
+        board = cls()
+
+        board.grid = [[None for _ in range(8)] for _ in range(8)]
+        board.pieces = []
+
+        piece_map = {
+            "pawn": Pawn,
+            "rook": Rook,
+            "knight": Knight,
+            "bishop": Bishop,
+            "queen": Queen,
+            "king": King,
+        }
+
+        for item in data:
+            full_name = item["name"]
+
+            color, piece_name = full_name.split("_")
+
+            piece_class = piece_map[piece_name]
+
+            piece = piece_class(
+                item["x"],
+                item["y"],
+                color,
+                item["image"]
+            )
+
+            board.place_piece(piece)
+
+        return board
+
     def is_square_attacked(self, x, y, by_color):
         for piece in self.pieces:
             if piece.color == by_color:
