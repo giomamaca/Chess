@@ -7,6 +7,7 @@ export type Screen =
   | "online-create-lobby"
   | "online-join-lobby"
   | "online-quick-match"
+  | "online-waiting-room"
   | "game";
 
 export type Piece = {

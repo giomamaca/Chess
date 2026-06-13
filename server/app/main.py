@@ -14,6 +14,10 @@ from db.database_classes.user_account import UserAccount
 from db.game_repository import GameRepository
 from db.user_repositories import UserRepository
 
+from .handlers.game_handler import GameHandlers
+
+connected_users = {}
+
 app = FastAPI()
 chess_board = Board()
 move_generator = MoveGenerator(chess_board)
@@ -22,8 +26,10 @@ auth = AuthService()
 game_repo = GameRepository()
 user_repo = UserRepository()
 
-# username -> WebSocket
 connected_users: dict[str, WebSocket] = {}
+game_handlers = GameHandlers(game_repo, user_repo, connected_users)
+
+# username -> WebSocket
 
 app.add_middleware(
     CORSMiddleware,
@@ -131,15 +137,15 @@ def print_grid():
                 print(short_name, end=" ")
         print()
 
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     username = None
 
     try:
-        # First message is always the username
         username = await websocket.receive_text()
-        print("username : ", username)
         connected_users[username] = websocket
         print(f"[WS] {username} connected")
 
@@ -149,100 +155,13 @@ async def websocket_endpoint(websocket: WebSocket):
             msg_type = data.get("type")
 
             if msg_type == "create_private_room":
-                user = user_repo.get_user_by_username(username)
-                if not user:
-                    await websocket.send_text(json.dumps({
-                        "type": "error",
-                        "message": "User not found"
-                    }))
-                    continue
-
-                user_id = user[0]
-                room_code = game_repo.create_private_room(user_id)
-                await websocket.send_text(json.dumps({
-                    "type": "room_created",
-                    "room_code": room_code
-                }))
+                await game_handlers.handle_create_private_room(websocket, username)
 
             elif msg_type == "join_private_room":
-                code = data.get("room_code", "").strip().upper()
-                user = user_repo.get_user_by_username(username)
-                if not user:
-                    await websocket.send_text(json.dumps({"type": "error", "message": "User not found"}))
-                    continue
-
-                user_id = user[0]
-                result = game_repo.join_private_room(code, user_id)
-
-                if not result:
-                    await websocket.send_text(json.dumps({
-                        "type": "error",
-                        "message": "Room not found or already full"
-                    }))
-                    continue
-
-                game_id, host_id, joining_color, host_color = result
-                host = user_repo.get_user_by_id(host_id)
-
-                await websocket.send_text(json.dumps({
-                    "type": "game_start",
-                    "game_id": game_id,
-                    "code": code,
-                    "color": joining_color
-                }))
-
-                if host and host[1] in connected_users:
-                    await connected_users[host[1]].send_text(json.dumps({
-                        "type": "game_start",
-                        "game_id": game_id,
-                        "code": code,
-                        "color": host_color
-                    }))
+                await game_handlers.handle_join_private_room(websocket, username, data)
 
             elif msg_type == "quick_match":
-                user = user_repo.get_user_by_username(username)
-                if not user:
-                    await websocket.send_text(json.dumps({"type": "error", "message": "User not found"}))
-                    continue
-
-                user_id = user[0]
-                free_game = game_repo.get_free_lobby(user_id)
-                if(free_game):
-                    print("ipova")
-                    
-                if free_game:
-                    game_id, white_id, black_id, code = free_game
-                    game_repo.join_lobby(game_id, user_id)
-
-                    host_id = white_id if white_id is not None else black_id
-                    joining_color = "white" if white_id is None else "black"
-                    host_color = "black" if joining_color == "white" else "white"
-
-                    host_user = user_repo.get_user_by_id(host_id)
-
-                    await websocket.send_text(json.dumps({
-                        "type": "game_start",
-                        "game_id": game_id,
-                        "code": code,
-                        "color": joining_color
-                    }))
-
-                    if host_user and host_user[1] in connected_users:
-                        await connected_users[host_user[1]].send_text(json.dumps({
-                            "type": "game_start",
-                            "game_id": game_id,
-                            "code": code,
-                            "color": host_color
-                        }))
-                    
-                else:
-                    game_id, code = game_repo.create_open_game(user_id)
-                    await websocket.send_text(json.dumps({
-                        "type": "searching",
-                        "game_id": game_id,
-                        "code": code
-                    }))
-                    print("serching.......")
+                await game_handlers.handle_quick_match(websocket, username)
 
     except WebSocketDisconnect:
         if username and username in connected_users:

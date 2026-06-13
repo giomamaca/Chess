@@ -146,6 +146,7 @@ class GameRepository:
         conn.commit()
         cur.close()
         conn.close()
+        print("ipova")
         return result
 
     def get_game(self, game_id: int):

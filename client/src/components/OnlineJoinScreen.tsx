@@ -1,42 +1,41 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Screen } from "../types";
 
 interface Props {
   setScreen: (screen: Screen) => void;
   handleBack: () => void;
-  ws: WebSocket | null;
-  connectWebSocket: (cb: () => void) => void;
+  connectWebSocket: (onReady: (socket: WebSocket) => void) => void;
 }
 
-export default function OnlineJoinScreen({ setScreen, handleBack, ws, connectWebSocket }: Props) {
+export default function OnlineJoinScreen({ setScreen, handleBack, connectWebSocket }: Props) {
   const [code, setCode] = useState("");
   const [status, setStatus] = useState("");
   const [searching, setSearching] = useState(false);
-  const [ready, setReady] = useState(false);
+  const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    connectWebSocket(() => setReady(true));
+    connectWebSocket((socket: WebSocket) => {
+      socketRef.current = socket;
+
+      socket.addEventListener("message", (event: MessageEvent) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "game_start") setScreen("game");
+        if (data.type === "error") {
+          setStatus(data.message);
+          setSearching(false);
+        }
+      });
+    });
   }, []);
 
-  useEffect(() => {
-    if (!ws) return;
-    const handleMessage = (event: MessageEvent) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "game_start") setScreen("game");
-      if (data.type === "error") {
-        setStatus(data.message);
-        setSearching(false);
-      }
-    };
-    ws.addEventListener("message", handleMessage);
-    return () => ws.removeEventListener("message", handleMessage);
-  }, [ws]);
-
   const handleJoinPrivate = () => {
-    if (!ws || !code.trim() || !ready) return;
+    if (!socketRef.current || !code.trim()) return;
     setSearching(true);
     setStatus("Joining room...");
-    ws.send(JSON.stringify({ type: "join_private_room", room_code: code.trim().toUpperCase() }));
+    socketRef.current.send(JSON.stringify({
+      type: "join_private_room",
+      room_code: code.trim().toUpperCase()
+    }));
   };
 
   return (
@@ -70,7 +69,7 @@ export default function OnlineJoinScreen({ setScreen, handleBack, ws, connectWeb
         <button
           className="btn btn-primary"
           onClick={handleJoinPrivate}
-          disabled={searching || !code.trim() || !ready}
+          disabled={searching || !code.trim()}
         >
           {searching ? "Joining..." : "Join Room"}
         </button>

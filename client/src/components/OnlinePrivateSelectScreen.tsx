@@ -1,12 +1,11 @@
 import { Screen } from "../types";
-import styles from "../styles";
 
 interface Props {
   setScreen: (screen: Screen) => void;
   handleBack: () => void;
 }
 
-export default function OnlinePrivateLobbyScreen({ setScreen, handleBack }: Props) {
+export default function OnlinePrivateSelectScreen({ setScreen, handleBack }: Props) {
   return (
     <div className="menu-root fade-in">
       <div className="chess-crown" style={{ fontSize: "2.5rem" }}>♜</div>

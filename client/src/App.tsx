@@ -4,13 +4,13 @@ import GameScreen from "./components/GameScreen";
 import MenuScreen from "./components/MenuScreen";
 import OfflineSelectScreen from "./components/OfflineSelectScreen";
 import OnlineSelectScreen from "./components/OnlineSelectScreen";
+import OnlinePrivateSelectScreen from "./components/OnlinePrivateSelectScreen";
 import OnlinePrivateLobbyScreen from "./components/OnlinePrivateSelectScreen";
 import OnlineJoinScreen from "./components/OnlineJoinScreen";
+import OnlineQuickMatchScreen from "./components/OnlineQuickMatchScreen";
 import { Screen, Piece, Move, PromotionData } from "./types";
-
 import BASE_URL from "./config";
 import styles from "./styles";
-import OnlineQuickMatchScreen from "./components/OnlineQuickMatchScreen";
 
 export type { Piece };
 
@@ -22,6 +22,7 @@ const HEADERS = {
 export default function App() {
   const ws = useRef<WebSocket | null>(null);
   const [screen, setScreen] = useState<Screen>("registration");
+  const [onlineStatus, setOnlineStatus] = useState("Connecting...");
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
   const [validMoves, setValidMoves] = useState<Move[]>([]);
@@ -41,36 +42,39 @@ export default function App() {
     }
   }, [screen]);
 
-  const connectWebSocket = (name: string, onReady?: () => void) => {
+  const connectWebSocket = (onReady?: (socket: WebSocket) => void) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      onReady?.();
+      onReady?.(ws.current);
       return;
     }
 
     const socket = new WebSocket(`${BASE_URL.replace("https", "wss")}/ws`);
     ws.current = socket;
 
-    socket.onopen = () => {
-      socket.send(name);
-      onReady?.();
-    };
-
-    socket.onmessage = (event: MessageEvent) => {
+    socket.addEventListener("open", () => {
+      const savedName = localStorage.getItem("name");
+      if (savedName) socket.send(savedName);
+      onReady?.(socket);
+    });
+    
+    socket.addEventListener("message", (event: MessageEvent) => {
       const data = JSON.parse(event.data);
-      if (data.type === "game_start" || data.type === "game_resume") {
-        localStorage.setItem("game_id", data.game_id);
-        localStorage.setItem("game_color", data.color);
-        setScreen("game");
-      }
-    };
+      if (data.type === "game_start") setScreen("game");
+      if (data.type === "searching") setOnlineStatus("Waiting for an opponent...");
+      if (data.type === "error") setOnlineStatus(data.message);
+    });
 
-    socket.onclose = () => {
+    socket.addEventListener("close", () => {
       console.log("Disconnected");
       setTimeout(() => {
         const savedName = localStorage.getItem("name");
-        if (savedName) connectWebSocket(savedName);
+        if (savedName) connectWebSocket();
       }, 2000);
-    };
+    });
+
+    socket.addEventListener("error", (err) => {
+      console.error("WebSocket error:", err);
+    });
   };
 
   const refreshBoard = () =>
@@ -89,8 +93,8 @@ export default function App() {
         .filter(p => !(p.x === col && p.y === row))
         .map(p =>
           p.name === selectedPiece.name &&
-            p.x === selectedPiece.x &&
-            p.y === selectedPiece.y
+          p.x === selectedPiece.x &&
+          p.y === selectedPiece.y
             ? { ...p, x: col, y: row }
             : p
         )
@@ -177,7 +181,11 @@ export default function App() {
       setScreen("menu");
     } else if (screen === "online-private") {
       setScreen("online-setup");
-    } else if (screen === "online-create-lobby" || screen === "online-join-lobby") {
+    } else if (
+      screen === "online-create-lobby" ||
+      screen === "online-join-lobby" ||
+      screen === "online-quick-match"
+    ) {
       setScreen("online-private");
     } else if (screen === "menu") {
       setLoggedIn(false);
@@ -217,25 +225,15 @@ export default function App() {
       )}
 
       {screen === "online-private" && (
-        <OnlineSelectScreen
-          setScreen={(s) => {
-            const savedName = localStorage.getItem("name");
-            if (savedName) connectWebSocket(savedName);
-            setScreen(s);
-          }}
-          handleBack={handleBack}
-        />
+        <OnlinePrivateSelectScreen setScreen={setScreen} handleBack={handleBack} />
       )}
-
+      
       {screen === "online-quick-match" && (
         <OnlineQuickMatchScreen
           setScreen={setScreen}
           handleBack={handleBack}
-          ws={ws.current}
-          connectWebSocket={(cb) => {
-            const savedName = localStorage.getItem("name");
-            if (savedName) connectWebSocket(savedName, cb);
-          }}
+          connectWebSocket={connectWebSocket}
+          status={onlineStatus}
         />
       )}
 
@@ -243,11 +241,7 @@ export default function App() {
         <OnlineJoinScreen
           setScreen={setScreen}
           handleBack={handleBack}
-          ws={ws.current}
-          connectWebSocket={(cb) => {
-            const savedName = localStorage.getItem("name");
-            if (savedName) connectWebSocket(savedName, cb);
-          }}
+          connectWebSocket={connectWebSocket}
         />
       )}
 

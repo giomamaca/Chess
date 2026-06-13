@@ -1,34 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Screen } from "../types";
 
 interface Props {
   setScreen: (screen: Screen) => void;
   handleBack: () => void;
-  ws: WebSocket | null;
-  connectWebSocket: (cb: () => void) => void;
+  connectWebSocket: (onReady: (socket: WebSocket) => void) => void;
+  status: string;
 }
 
-export default function OnlineQuickMatchScreen({ setScreen, handleBack, ws, connectWebSocket }: Props) {
-  const [status, setStatus] = useState("Connecting...");
+interface Props {
+  setScreen: (screen: Screen) => void;
+  handleBack: () => void;
+  connectWebSocket: (onReady: (socket: WebSocket) => void) => void;
+  status: string;
+}
 
+export default function OnlineQuickMatchScreen({ setScreen, handleBack, connectWebSocket, status }: Props) {
   useEffect(() => {
-    connectWebSocket(() => {
-      setStatus("Searching for an opponent...");
-      ws?.send(JSON.stringify({ type: "quick_match" }));
+    connectWebSocket((socket: WebSocket) => {
+      socket.send(JSON.stringify({ type: "quick_match" }));
     });
   }, []);
-
-  useEffect(() => {
-    if (!ws) return;
-    const handleMessage = (event: MessageEvent) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "game_start") setScreen("game");
-      if (data.type === "searching") setStatus("Waiting for an opponent...");
-      if (data.type === "error") setStatus(data.message);
-    };
-    ws.addEventListener("message", handleMessage);
-    return () => ws.removeEventListener("message", handleMessage);
-  }, [ws]);
 
   return (
     <div className="menu-root fade-in">
@@ -37,8 +29,7 @@ export default function OnlineQuickMatchScreen({ setScreen, handleBack, ws, conn
       <p className="mode-desc">{status}</p>
       <div className="divider" />
       <div style={{
-        width: "40px",
-        height: "40px",
+        width: "40px", height: "40px",
         border: "3px solid #2a2a2a",
         borderTop: "3px solid #d4af37",
         borderRadius: "50%",
