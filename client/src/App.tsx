@@ -5,7 +5,6 @@ import MenuScreen from "./components/MenuScreen";
 import OfflineSelectScreen from "./components/OfflineSelectScreen";
 import OnlineSelectScreen from "./components/OnlineSelectScreen";
 import OnlinePrivateSelectScreen from "./components/OnlinePrivateSelectScreen";
-import OnlinePrivateLobbyScreen from "./components/OnlinePrivateSelectScreen";
 import OnlineJoinScreen from "./components/OnlineJoinScreen";
 import OnlineQuickMatchScreen from "./components/OnlineQuickMatchScreen";
 import { Screen, Piece, Move, PromotionData } from "./types";
@@ -24,21 +23,37 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("registration");
   const [onlineStatus, setOnlineStatus] = useState("Connecting...");
   const [pieces, setPieces] = useState<Piece[]>([]);
-  const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
   const [validMoves, setValidMoves] = useState<Move[]>([]);
+  const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
   const [promotionData, setPromotionData] = useState<PromotionData | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null); 
   const [loggedIn, setLoggedIn] = useState<boolean>(false);
+  const [gameType, setGameType] = useState<String | null> (null); 
   const [gameState, setGameState] = useState<{
     game_state: "ongoing" | "checkmate" | "stalemate";
     current_turn: "white" | "black";
   }>({ game_state: "ongoing", current_turn: "white" });
 
+  const handleGameStart = async () => {
+    const res = await fetch(`${BASE_URL}/${gameType}/create`, { headers: HEADERS, method: "POST" });
+    const data = await res.json();
+    setSessionId(data.session_id);
+    setScreen("game-offline");
+  };
+
   useEffect(() => {
-    if (screen === "game") {
-      fetch(`${BASE_URL}/board`, { headers: HEADERS })
+    if (screen === "game-offline" && sessionId) {
+      fetch(`${BASE_URL}/${gameType}/board/${sessionId}`, { headers: HEADERS })
         .then(res => res.json())
-        .then(setPieces)
-        .catch(err => console.error("Fetch error:", err));
+        .then(setPieces);
+    }
+  }, [screen, sessionId]);
+
+  useEffect(() => {
+    if (screen === "game-offline") {
+      setGameType("offline")
+    }else if (screen === "game-online"){
+      setGameType("online");
     }
   }, [screen]);
 
@@ -59,7 +74,7 @@ export default function App() {
     
     socket.addEventListener("message", (event: MessageEvent) => {
       const data = JSON.parse(event.data);
-      if (data.type === "game_start") setScreen("game");
+      if (data.type === "game_start") setScreen("game-online");
       if (data.type === "searching") setOnlineStatus("Waiting for an opponent...");
       if (data.type === "error") setOnlineStatus(data.message);
     });
@@ -78,13 +93,12 @@ export default function App() {
   };
 
   const refreshBoard = () =>
-    fetch(`${BASE_URL}/board`, { headers: HEADERS })
+    fetch(`${BASE_URL}/${gameType}/board/${sessionId}`, { headers: HEADERS })
       .then(res => res.json())
-      .then(board => setPieces(board));
+      .then(setPieces);
 
   const handleSquareClick = async (row: number, col: number) => {
     if (!selectedPiece) return;
-
     const isValid = validMoves.some(move => move.x === col && move.y === row);
     if (!isValid) return;
 
@@ -92,87 +106,75 @@ export default function App() {
       prev
         .filter(p => !(p.x === col && p.y === row))
         .map(p =>
-          p.name === selectedPiece.name &&
-          p.x === selectedPiece.x &&
-          p.y === selectedPiece.y
+          p.name === selectedPiece.name && p.x === selectedPiece.x && p.y === selectedPiece.y
             ? { ...p, x: col, y: row }
             : p
         )
     );
-
     setSelectedPiece(null);
     setValidMoves([]);
 
     try {
-      const res = await fetch(`${BASE_URL}/move`, {
+      const res = await fetch(`${BASE_URL}/${gameType}/move/${sessionId}`, {
         method: "POST",
         headers: HEADERS,
         body: JSON.stringify({
-          name: selectedPiece.name,
           from: [selectedPiece.x, selectedPiece.y],
           to: [col, row],
         }),
       });
-
       const data = await res.json();
-
       if (data.ok) {
         setPieces(data.board);
         setGameState(data.game_status);
-        if (data.promotion?.ok) {
-          setPromotionData(data.promotion.data);
-        }
+        if (data.promotion?.ok) setPromotionData(data.promotion.data);
       } else {
-        console.error("Move error:", data.error);
         await refreshBoard();
       }
-    } catch (err) {
-      console.error("Move request failed:", err);
+    } catch {
       await refreshBoard();
     }
   };
 
   const handlePromotion = (pieceName: string) => {
     if (!promotionData) return;
-    fetch(`${BASE_URL}/promote`, {
+    fetch(`${BASE_URL}/${gameType}/promote/${sessionId}`, {
       method: "POST",
       headers: HEADERS,
       body: JSON.stringify({ x: promotionData.x, y: promotionData.y, piece: pieceName }),
     })
       .then(res => res.json())
-      .then(() => { setPromotionData(null); refreshBoard(); })
-      .catch(err => console.error("Promotion failed:", err));
+      .then(() => { setPromotionData(null); refreshBoard(); });
   };
 
   const handlePieceClick = (piece: Piece) => {
     setSelectedPiece(piece);
     setValidMoves([]);
-    fetch(`${BASE_URL}/valid-moves`, {
+    fetch(`${BASE_URL}/${gameType}/valid-moves/${sessionId}`, {
       method: "POST",
       headers: HEADERS,
       body: JSON.stringify(piece),
     })
       .then(res => res.json())
-      .then((data: Move[]) => setValidMoves(data))
-      .catch(err => console.error("Valid moves error:", err));
+      .then((data: Move[]) => setValidMoves(data));
   };
 
   const handleReset = () => {
-    fetch(`${BASE_URL}/game-reset`, { headers: HEADERS })
+    fetch(`${BASE_URL}/${gameType}/reset/${sessionId}`, { method: "POST", headers: HEADERS })
       .then(res => res.json())
       .then(data => {
-        if (data === null || data?.ok === undefined || data?.ok) {
+        if (data?.ok) {
           refreshBoard();
           setGameState({ game_state: "ongoing", current_turn: "white" });
-        } else {
-          console.error("Reset failed", data);
         }
-      })
-      .catch(err => console.error("Reset request failed:", err));
+      });
   };
 
   const handleBack = () => {
-    if (screen === "game") {
+    if (screen === "game-offline") {
+      // end session when leaving
+      fetch(`${BASE_URL}/${gameType}/end/${sessionId}`, { method: "DELETE", headers: HEADERS });
+      setSessionId(null);
       setScreen("offline-setup");
       setPieces([]);
       setSelectedPiece(null);
@@ -217,9 +219,12 @@ export default function App() {
       )}
 
       {screen === "offline-setup" && (
-        <OfflineSelectScreen setScreen={setScreen} handleBack={handleBack} />
+        <OfflineSelectScreen
+          setScreen={setScreen}
+          handleBack={handleBack}
+          onStartGame={handleGameStart}
+        />
       )}
-
       {screen === "online-setup" && (
         <OnlineSelectScreen setScreen={setScreen} handleBack={handleBack} />
       )}
@@ -245,7 +250,7 @@ export default function App() {
         />
       )}
 
-      {screen === "game" && (
+      {screen === "game-offline" && (
         <GameScreen
           pieces={pieces}
           selectedPiece={selectedPiece}

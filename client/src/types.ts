@@ -8,7 +8,8 @@ export type Screen =
   | "online-join-lobby"
   | "online-quick-match"
   | "online-waiting-room"
-  | "game";
+  | "game-offline"
+  | "game-online";
 
 export type Piece = {
   name: string;

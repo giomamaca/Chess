@@ -2,11 +2,11 @@ import json
 from fastapi import WebSocket
 
 class GameHandlers:
-    def __init__(self, game_repo, user_repo, connected_users: dict):
+    def __init__(self, game_repo, user_repo, connected_users: dict, board_from_game_id: dict):
         self.game_repo = game_repo
         self.user_repo = user_repo
         self.connected_users = connected_users
-        
+        self.board_from_game_id =  board_from_game_id
 
     async def handle_create_private_room(self, websocket: WebSocket, username: str):
         user = self.user_repo.get_user_by_username(username)
@@ -95,7 +95,7 @@ class GameHandlers:
                 }))
         else:
             #print("free_game not exist !!!")
-            game_id, code = self.game_repo.create_open_game(user_id)
+            board, game_id, code = self.game_repo.create_open_game(user_id)
             #print("game was creaeeted by ", user_id)
             
             #print("it's WebSocket is : ", self.connected_users[username])
@@ -105,3 +105,4 @@ class GameHandlers:
                 "game_id": game_id,
                 "code": code
             }))
+            self.board_from_game_id[game_id] = board

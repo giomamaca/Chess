@@ -1,11 +1,12 @@
 import { Screen } from "../types";
-  
+
 interface Props {
   setScreen: (screen: Screen) => void;
   handleBack: () => void;
+  onStartGame: () => void;
 }
 
-export default function OfflineSelectScreen({ setScreen, handleBack }: Props) {
+export default function OfflineSelectScreen({ setScreen, handleBack, onStartGame }: Props) {
   return (
     <div className="menu-root fade-in">
       <div className="chess-crown" style={{ fontSize: "2.5rem" }}>♟</div>
@@ -15,7 +16,7 @@ export default function OfflineSelectScreen({ setScreen, handleBack }: Props) {
       <div className="btn-group">
         <button
           className="btn btn-primary"
-          onClick={() => setScreen("game")}
+          onClick={onStartGame}
         >
           1 v 1
         </button>

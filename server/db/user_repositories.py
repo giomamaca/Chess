@@ -1,11 +1,6 @@
 from db.session import get_connection
-from db.init_db import init_db
-
 
 class UserRepository:
-    def __init__(self):
-        init_db()
-
     def create_user(self, username: str, password_hash: str):
         conn = get_connection()
         cur = conn.cursor()

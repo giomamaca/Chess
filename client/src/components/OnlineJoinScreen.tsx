@@ -19,7 +19,7 @@ export default function OnlineJoinScreen({ setScreen, handleBack, connectWebSock
 
       socket.addEventListener("message", (event: MessageEvent) => {
         const data = JSON.parse(event.data);
-        if (data.type === "game_start") setScreen("game");
+        if (data.type === "game_start") setScreen("game-online");
         if (data.type === "error") {
           setStatus(data.message);
           setSearching(false);

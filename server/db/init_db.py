@@ -30,6 +30,15 @@ def init_db():
         );
     """)
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS game_state (
+            id SERIAL PRIMARY KEY,
+            game_id INTEGER REFERENCES games(id),
+            board JSONB
+        );
+    """)
+
+
     conn.commit()
     cur.close()
     conn.close()

@@ -2,17 +2,12 @@ import os
 import random
 import string
 from db.session import get_connection
-from db.init_db import init_db
-
+from app.board import Board
 
 def generate_code(length=8) -> str:
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
-
 class GameRepository:
-    def __init__(self):
-        init_db()
-
     def create_game(self, white_player_id: int, black_player_id: int) -> int:
         conn = get_connection()
         cur = conn.cursor()
@@ -33,6 +28,8 @@ class GameRepository:
 
     def create_open_game(self, player_id: int) -> tuple:
         """Create a quick match game with random color assignment."""
+        board = Board()
+
         conn = get_connection()
         cur = conn.cursor()
         code = generate_code()
@@ -57,7 +54,7 @@ class GameRepository:
         conn.commit()
         cur.close()
         conn.close()
-        return game_id, code
+        return board, game_id, code
 
     def create_private_room(self, player_id: int) -> str:
         """Create a private room with random color assignment. Returns room code."""
@@ -149,7 +146,7 @@ class GameRepository:
         print("ipova")
         return result
 
-    def get_game(self, game_id: int):
+    def get_game_by_gameId(self, game_id: int):
         conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
@@ -174,3 +171,32 @@ class GameRepository:
         cur.close()
         conn.close()
         return game
+    
+    def get_game_by_player(self, user_id : int):
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, code, white_player_id, black_player_id,
+                   current_turn, status
+            FROM games WHERE white_player_id = %s OR black_player_id = %s
+        """, (user_id, user_id))
+        game = cur.fetchone()
+        cur.close()
+        conn.close()
+        return game
+    
+    def remove_game(self, game_id: int):
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            DELETE FROM games WHERE id = %s
+        """, (game_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+    
+    def get_player_color(self, user_id: int, game):
+        if game[2] == user_id:
+            return "white"
+        return "black"
+        
