@@ -8,24 +8,6 @@ def generate_code(length=8) -> str:
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 class GameRepository:
-    def create_game(self, white_player_id: int, black_player_id: int) -> int:
-        conn = get_connection()
-        cur = conn.cursor()
-        code = generate_code()
-        cur.execute("""
-            INSERT INTO games (
-                code, white_player_id, black_player_id,
-                current_turn, status
-            )
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING id
-        """, (code, white_player_id, black_player_id, "white", "active"))
-        game_id = cur.fetchone()[0]
-        conn.commit()
-        cur.close()
-        conn.close()
-        return game_id
-
     def create_open_game(self, player_id: int) -> tuple:
         """Create a quick match game with random color assignment."""
         board = Board()

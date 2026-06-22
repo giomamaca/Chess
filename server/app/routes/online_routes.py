@@ -17,8 +17,10 @@ from db.game_repository import GameRepository
 router = APIRouter(prefix="/online", tags=["online"])
 
 connected_users: dict = {}
+board_from_game_id:dict= {}
 user_repo = UserRepository()
 game_repo = GameRepository()
+game_handlers = GameHandlers(game_repo, user_repo, connected_users, board_from_game_id)
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

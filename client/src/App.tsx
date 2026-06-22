@@ -8,15 +8,18 @@ import OnlinePrivateSelectScreen from "./components/OnlinePrivateSelectScreen";
 import OnlineJoinScreen from "./components/OnlineJoinScreen";
 import OnlineQuickMatchScreen from "./components/OnlineQuickMatchScreen";
 import { Screen, Piece, Move, PromotionData } from "./types";
-import BASE_URL from "./config";
 import styles from "./styles";
+import {
+  createOfflineSession,
+  fetchBoard,
+  offlineMove,
+  offlineValidMoves,
+  offlinePromotion,
+  offlineReset,
+  endOfflineSession,
+} from "./OfflineGameFunctions";
 
 export type { Piece };
-
-const HEADERS = {
-  "Content-Type": "application/json",
-  "ngrok-skip-browser-warning": "true",
-};
 
 export default function App() {
   const ws = useRef<WebSocket | null>(null);
@@ -26,76 +29,26 @@ export default function App() {
   const [validMoves, setValidMoves] = useState<Move[]>([]);
   const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
   const [promotionData, setPromotionData] = useState<PromotionData | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null); 
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [loggedIn, setLoggedIn] = useState<boolean>(false);
-  const [gameType, setGameType] = useState<String | null> (null); 
   const [gameState, setGameState] = useState<{
     game_state: "ongoing" | "checkmate" | "stalemate";
     current_turn: "white" | "black";
   }>({ game_state: "ongoing", current_turn: "white" });
 
-  const handleGameStart = async () => {
-    const res = await fetch(`${BASE_URL}/${gameType}/create`, { headers: HEADERS, method: "POST" });
-    const data = await res.json();
-    setSessionId(data.session_id);
-    setScreen("game-offline");
+  const refreshBoard = () => {
+    if (sessionId) fetchBoard(sessionId, setPieces);
   };
 
   useEffect(() => {
-    if (screen === "game-offline" && sessionId) {
-      fetch(`${BASE_URL}/${gameType}/board/${sessionId}`, { headers: HEADERS })
-        .then(res => res.json())
-        .then(setPieces);
-    }
+    if (screen === "game-offline" && sessionId) fetchBoard(sessionId, setPieces);
   }, [screen, sessionId]);
 
-  useEffect(() => {
-    if (screen === "game-offline") {
-      setGameType("offline")
-    }else if (screen === "game-online"){
-      setGameType("online");
-    }
-  }, [screen]);
-
-  const connectWebSocket = (onReady?: (socket: WebSocket) => void) => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      onReady?.(ws.current);
-      return;
-    }
-
-    const socket = new WebSocket(`${BASE_URL.replace("https", "wss")}/ws`);
-    ws.current = socket;
-
-    socket.addEventListener("open", () => {
-      const savedName = localStorage.getItem("name");
-      if (savedName) socket.send(savedName);
-      onReady?.(socket);
-    });
-    
-    socket.addEventListener("message", (event: MessageEvent) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "game_start") setScreen("game-online");
-      if (data.type === "searching") setOnlineStatus("Waiting for an opponent...");
-      if (data.type === "error") setOnlineStatus(data.message);
-    });
-
-    socket.addEventListener("close", () => {
-      console.log("Disconnected");
-      setTimeout(() => {
-        const savedName = localStorage.getItem("name");
-        if (savedName) connectWebSocket();
-      }, 2000);
-    });
-
-    socket.addEventListener("error", (err) => {
-      console.error("WebSocket error:", err);
-    });
+  const handleGameStart = async () => {
+    const session_id = await createOfflineSession();
+    setSessionId(session_id);
+    setScreen("game-offline");
   };
-
-  const refreshBoard = () =>
-    fetch(`${BASE_URL}/${gameType}/board/${sessionId}`, { headers: HEADERS })
-      .then(res => res.json())
-      .then(setPieces);
 
   const handleSquareClick = async (row: number, col: number) => {
     if (!selectedPiece) return;
@@ -114,66 +67,36 @@ export default function App() {
     setSelectedPiece(null);
     setValidMoves([]);
 
-    try {
-      const res = await fetch(`${BASE_URL}/${gameType}/move/${sessionId}`, {
-        method: "POST",
-        headers: HEADERS,
-        body: JSON.stringify({
-          from: [selectedPiece.x, selectedPiece.y],
-          to: [col, row],
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setPieces(data.board);
-        setGameState(data.game_status);
-        if (data.promotion?.ok) setPromotionData(data.promotion.data);
-      } else {
-        await refreshBoard();
-      }
-    } catch {
-      await refreshBoard();
-    }
-  };
-
-  const handlePromotion = (pieceName: string) => {
-    if (!promotionData) return;
-    fetch(`${BASE_URL}/${gameType}/promote/${sessionId}`, {
-      method: "POST",
-      headers: HEADERS,
-      body: JSON.stringify({ x: promotionData.x, y: promotionData.y, piece: pieceName }),
-    })
-      .then(res => res.json())
-      .then(() => { setPromotionData(null); refreshBoard(); });
+    await offlineMove(
+      sessionId!,
+      selectedPiece,
+      col,
+      row,
+      setPieces,
+      setGameState,
+      setPromotionData,
+      refreshBoard
+    );
   };
 
   const handlePieceClick = (piece: Piece) => {
     setSelectedPiece(piece);
     setValidMoves([]);
-    fetch(`${BASE_URL}/${gameType}/valid-moves/${sessionId}`, {
-      method: "POST",
-      headers: HEADERS,
-      body: JSON.stringify(piece),
-    })
-      .then(res => res.json())
-      .then((data: Move[]) => setValidMoves(data));
+    offlineValidMoves(sessionId!, piece, setValidMoves);
+  };
+
+  const handlePromotion = (pieceName: string) => {
+    if (!promotionData) return;
+    offlinePromotion(sessionId!, promotionData, pieceName, setPromotionData, refreshBoard);
   };
 
   const handleReset = () => {
-    fetch(`${BASE_URL}/${gameType}/reset/${sessionId}`, { method: "POST", headers: HEADERS })
-      .then(res => res.json())
-      .then(data => {
-        if (data?.ok) {
-          refreshBoard();
-          setGameState({ game_state: "ongoing", current_turn: "white" });
-        }
-      });
+    if (sessionId) offlineReset(sessionId, refreshBoard, setGameState);
   };
 
   const handleBack = () => {
     if (screen === "game-offline") {
-      // end session when leaving
-      fetch(`${BASE_URL}/${gameType}/end/${sessionId}`, { method: "DELETE", headers: HEADERS });
+      if (sessionId) endOfflineSession(sessionId);
       setSessionId(null);
       setScreen("offline-setup");
       setPieces([]);
@@ -193,6 +116,41 @@ export default function App() {
       setLoggedIn(false);
       setScreen("registration");
     }
+  };
+
+  const connectWebSocket = (onReady?: (socket: WebSocket) => void) => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      onReady?.(ws.current);
+      return;
+    }
+
+    const socket = new WebSocket(`${import.meta.env.VITE_BASE_URL.replace("https", "wss")}/ws`);
+    ws.current = socket;
+
+    socket.addEventListener("open", () => {
+      const savedName = localStorage.getItem("name");
+      if (savedName) socket.send(savedName);
+      onReady?.(socket);
+    });
+
+    socket.addEventListener("message", (event: MessageEvent) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "game_start") setScreen("game-online");
+      if (data.type === "searching") setOnlineStatus("Waiting for an opponent...");
+      if (data.type === "error") setOnlineStatus(data.message);
+    });
+
+    socket.addEventListener("close", () => {
+      console.log("Disconnected");
+      setTimeout(() => {
+        const savedName = localStorage.getItem("name");
+        if (savedName) connectWebSocket();
+      }, 2000);
+    });
+
+    socket.addEventListener("error", (err) => {
+      console.error("WebSocket error:", err);
+    });
   };
 
   if (!loggedIn) {
@@ -220,11 +178,11 @@ export default function App() {
 
       {screen === "offline-setup" && (
         <OfflineSelectScreen
-          setScreen={setScreen}
           handleBack={handleBack}
           onStartGame={handleGameStart}
         />
       )}
+
       {screen === "online-setup" && (
         <OnlineSelectScreen setScreen={setScreen} handleBack={handleBack} />
       )}
@@ -232,7 +190,7 @@ export default function App() {
       {screen === "online-private" && (
         <OnlinePrivateSelectScreen setScreen={setScreen} handleBack={handleBack} />
       )}
-      
+
       {screen === "online-quick-match" && (
         <OnlineQuickMatchScreen
           setScreen={setScreen}

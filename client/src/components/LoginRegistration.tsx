@@ -133,23 +133,19 @@ export default function LogRegistration({ setLoggedIn, setScreen, styles }: Prop
   `;
 
   const handleDataResult = async (api: string) => {
-    const res = await fetch(
-      `${BASE_URL}/${api}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
-        },
-        body: JSON.stringify({
-          username: form.username,
-          password: form.password,
-        }),
-      }
-    );
-    const data = await res.json();
-    console.log(data);
-    return data;
+      const res = await fetch(`${BASE_URL}/auth/${api}`, {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json",
+              "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify({
+              username: form.username,
+              password: form.password,
+          }),
+      });
+      const data = await res.json();
+      return data;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -167,15 +163,15 @@ export default function LogRegistration({ setLoggedIn, setScreen, styles }: Prop
 
     setLoading(true);
     try {
-      const api = authScreen === "login" ? "account-login" : "account-register";
+      const api = authScreen === "login" ? "login" : "register";
       const data = await handleDataResult(api);
-      if (data) {
-        localStorage.setItem("name", form.username);
-        setLoggedIn(true);
-        setScreen("menu");
+      if (data.success) {
+          localStorage.setItem("name", form.username);
+          setLoggedIn(true);
+          setScreen("menu");
       } else {
-        setError("Invalid credentials. Please try again.");
-        setForm({ username: "", password: "", confirm: "" });
+          setError(data.detail || "Invalid credentials. Please try again.");
+          setForm({ username: "", password: "", confirm: "" });
       }
     } catch (err: any) {
       setError(err?.message || "Something went wrong.");
@@ -261,7 +257,7 @@ export default function LogRegistration({ setLoggedIn, setScreen, styles }: Prop
               disabled={loading}
               style={{ width: "100%", textAlign: "center" }}
             >
-              {loading ? "…" : authScreen === "login" ? "Enter the Board" : "Create Account"}
+              {loading ? "…" : authScreen === "login" ? "Log In" : "Create Account"}
             </button>
           </form>
 

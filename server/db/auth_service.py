@@ -16,7 +16,6 @@ class AuthService:
 
     def login(self, username, password):
         user = self.repo.get_user_by_username(username)
-
         if not user:
             return False
 

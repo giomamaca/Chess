@@ -23,11 +23,6 @@ init_db()
 
 app = FastAPI()
 
-app.include_router(auth_routes.router)
-app.include_router(offline_routes.router)
-app.include_router(online_routes.router)
-
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,41 +30,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# @app.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websocket.accept()
-#     username = None
-
-#     try:
-#         username = await websocket.receive_text()
-#         connected_users[username] = websocket
-#         print(f"[WS] {username} connected")
-
-
-#         while True:
-#             raw = await websocket.receive_text()
-#             data = json.loads(raw)
-#             msg_type = data.get("type")
-
-#             if msg_type == "create_private_room":
-#                 await game_handlers.handle_create_private_room(websocket, username)
-
-#             elif msg_type == "join_private_room":
-#                 await game_handlers.handle_join_private_room(websocket, username, data)
-
-#             elif msg_type == "quick_match":
-#                 await game_handlers.handle_quick_match(websocket, username)
-
-#     except WebSocketDisconnect:
-#         if username and username in connected_users:
-#             del connected_users[username]
-#             user = user_repo.get_user_by_username(username)
-#             game = game_repo.get_game_by_player(user[0])
-#             if (game[2] == user[0] and game[3] is None) or (game[3] == user[0] and game[2] is None):
-#                 game_repo.remove_game(game[0])
-            
-#             print(f"[WS] {username} disconnected")
-
+app.include_router(auth_routes.router)
+app.include_router(offline_routes.router)
+app.include_router(online_routes.router)
 
 BUILD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "client", "build")
 
