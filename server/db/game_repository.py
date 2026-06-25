@@ -25,12 +25,11 @@ class GameRepository:
 
         cur.execute("""
             INSERT INTO games (
-                code, white_player_id, black_player_id,
-                current_turn, status
+                code, white_player_id, black_player_id, status
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s)
             RETURNING id
-        """, (code, white_id, black_id, "white", "waiting"))
+        """, (code, white_id, black_id, "waiting"))
 
         game_id = cur.fetchone()[0]
         conn.commit()
@@ -53,11 +52,10 @@ class GameRepository:
 
         cur.execute("""
             INSERT INTO games (
-                code, white_player_id, black_player_id,
-                current_turn, status
+                code, white_player_id, black_player_id, status
             )
-            VALUES (%s, %s, %s, %s, %s)
-        """, (code, white_id, black_id, "white", "private"))
+            VALUES (%s, %s, %s, %s)
+        """, (code, white_id, black_id, "private"))
         conn.commit()
         cur.close()
         conn.close()
@@ -145,8 +143,7 @@ class GameRepository:
         conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
-            SELECT id, code, white_player_id, black_player_id,
-                   current_turn, status
+            SELECT id, code, white_player_id, black_player_id, status
             FROM games WHERE code = %s
         """, (code,))
         game = cur.fetchone()
@@ -158,8 +155,7 @@ class GameRepository:
         conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
-            SELECT id, code, white_player_id, black_player_id,
-                   current_turn, status
+            SELECT id, code, white_player_id, black_player_id, status
             FROM games WHERE white_player_id = %s OR black_player_id = %s
         """, (user_id, user_id))
         game = cur.fetchone()

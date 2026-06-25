@@ -183,6 +183,42 @@ class Board:
             for piece in self.pieces
         ]
     
+    def board_to_string(self):
+        board_string = ""
+
+        for y in range(8):
+            empty_count = 0
+
+            for x in range(8):
+                piece = self.grid[x][y]
+
+                if piece is None:
+                    empty_count += 1
+
+                else:
+                    if empty_count > 0:
+                        board_string += str(empty_count)
+                        empty_count = 0
+
+                    name = piece.get_name()
+
+                    piece_letter = name.split("_")[1][0]
+
+                    if "white" in name:
+                        piece_letter = piece_letter.upper()
+                    else:
+                        piece_letter = piece_letter.lower()
+
+                    board_string += piece_letter
+
+            if empty_count > 0:
+                board_string += str(empty_count)
+
+            if y != 7:
+                board_string += "/"
+
+        return board_string
+    
     @classmethod
     def board_from_json(cls, data):
         board = cls()

@@ -1,12 +1,11 @@
 import { Screen } from "../types";
 
 interface Props {
-  setScreen: (screen: Screen) => void;
   handleBack: () => void;
   onStartGame: () => void;
 }
 
-export default function OfflineSelectScreen({ setScreen, handleBack, onStartGame }: Props) {
+export default function OfflineSelectScreen({handleBack, onStartGame }: Props) {
   return (
     <div className="menu-root fade-in">
       <div className="chess-crown" style={{ fontSize: "2.5rem" }}>♟</div>

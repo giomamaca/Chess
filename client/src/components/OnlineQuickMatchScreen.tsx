@@ -8,13 +8,6 @@ interface Props {
   status: string;
 }
 
-interface Props {
-  setScreen: (screen: Screen) => void;
-  handleBack: () => void;
-  connectWebSocket: (onReady: (socket: WebSocket) => void) => void;
-  status: string;
-}
-
 export default function OnlineQuickMatchScreen({ setScreen, handleBack, connectWebSocket, status }: Props) {
   useEffect(() => {
     connectWebSocket((socket: WebSocket) => {

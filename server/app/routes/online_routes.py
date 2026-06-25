@@ -1,5 +1,4 @@
 import json
-import uuid
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,7 +31,6 @@ async def websocket_endpoint(websocket: WebSocket):
         connected_users[username] = websocket
         print(f"[WS] {username} connected")
 
-
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
@@ -52,7 +50,7 @@ async def websocket_endpoint(websocket: WebSocket):
             del connected_users[username]
             user = user_repo.get_user_by_username(username)
             game = game_repo.get_game_by_player(user[0])
-            if (game[2] == user[0] and game[3] is None) or (game[3] == user[0] and game[2] is None):
+            if game and ((game[2] == user[0] and game[3] is None) or (game[3] == user[0] and game[2] is None)):
                 game_repo.remove_game(game[0])
             
             print(f"[WS] {username} disconnected")

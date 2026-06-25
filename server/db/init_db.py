@@ -23,7 +23,6 @@ def init_db():
             white_player_id INTEGER REFERENCES users(id),
             black_player_id INTEGER REFERENCES users(id),
 
-            current_turn VARCHAR(10) DEFAULT 'white',
             status VARCHAR(20) DEFAULT 'waiting',
 
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -34,7 +33,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS game_state (
             id SERIAL PRIMARY KEY,
             game_id INTEGER REFERENCES games(id),
-            board JSONB
+            current_turn VARCHAR(10) DEFAULT 'white',
+            board_state VARCHAR(100)
         );
     """)
 
