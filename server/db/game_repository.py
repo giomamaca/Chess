@@ -130,8 +130,7 @@ class GameRepository:
         conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
-            SELECT id, code, white_player_id, black_player_id,
-                   current_turn, status
+            SELECT id, code, white_player_id, black_player_id, status
             FROM games WHERE id = %s
         """, (game_id,))
         game = cur.fetchone()

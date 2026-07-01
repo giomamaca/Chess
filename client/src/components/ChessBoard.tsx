@@ -23,7 +23,6 @@ export default function ChessBoard({
 
   const isValidMove = (x: number, y: number) =>
     validMoves.some(move => move.x === x && move.y === y);
-
   return (
     <div
       style={{
@@ -43,16 +42,13 @@ export default function ChessBoard({
       >
         {Array.from({ length: 8 }).map((_, vRow) =>
           Array.from({ length: 8 }).map((_, vCol) => {
-            // Map the on-screen cell to logical board coordinates.
-            // When flipped (black's view) the board is rotated 180°,
-            // but lookups + click handlers always use absolute coords.
             const col = flipped ? 7 - vCol : vCol;
             const row = flipped ? 7 - vRow : vRow;
 
             const piece = getPieceAt(col, row);
             const selected =
               selectedPiece?.x === col && selectedPiece?.y === row;
-
+            
             return (
               <Square
                 key={`${vRow}-${vCol}`}

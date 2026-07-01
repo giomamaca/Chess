@@ -6,7 +6,6 @@ type Move = { x: number; y: number };
 type PromotionOffer = { name: string; image: string };
 type PromotionData = { x: number; y: number; color: string; offers: PromotionOffer[] };
 
-
 interface Props {
   pieces: Piece[];
   selectedPiece: Piece | null;
@@ -26,9 +25,11 @@ interface Props {
   setPieces: (pieces: Piece[]) => void;
   setSelectedPiece: (piece: Piece | null) => void;
   setValidMoves: (moves: Move[]) => void;
+  isOnline?: boolean;
+  myColor?: "white" | "black" | null;
 }
 
-export default function GameScreen({
+export default function OfflineGameScreen({
   pieces,
   selectedPiece,
   validMoves,
@@ -44,13 +45,24 @@ export default function GameScreen({
   setPieces,
   setSelectedPiece,
   setValidMoves,
+  isOnline = false,
+  myColor = null,
 }: Props) {
+  const flipped = myColor === "black";
+  const isOver =
+    gameState.game_state === "checkmate" || gameState.game_state === "stalemate";
+  const isMyTurn = isOnline ? gameState.current_turn === myColor : true;
+
+  const winner = gameState.current_turn === "white" ? "Black" : "White";
+
   return (
     <div className="game-root fade-in">
       <div className="game-header">
         <div>
-          <div className="game-header-title">REGICIDE</div>
-          <div className="game-header-mode">Offline · 1v1</div>
+          <div className="game-header-title">Chess</div>
+          <div className="game-header-mode">
+            {isOnline ? "Online · 1v1" : "Offline · 1v1"}
+          </div>
         </div>
         <div style={{ display: "flex", gap: "0.75rem" }}>
           <button
@@ -76,23 +88,51 @@ export default function GameScreen({
         </div>
       </div>
 
+      {isOnline && myColor && (
+        <div
+          style={{
+            textAlign: "center",
+            margin: "0.5rem 0",
+            fontSize: "0.85rem",
+            letterSpacing: "0.05em",
+            opacity: isMyTurn || isOver ? 1 : 0.6,
+          }}
+        >
+          You are {myColor === "white" ? "White" : "Black"} ·{" "}
+          {isOver ? "Game over" : isMyTurn ? "Your move" : "Opponent's move"}
+        </div>
+      )}
+
       <ChessBoard
         pieces={pieces}
         selectedPiece={selectedPiece}
         validMoves={validMoves}
         onSquareClick={handleSquareClick}
         onPieceClick={handlePieceClick}
+        flipped={flipped}
       />
 
       {selectedPiece && (
         <p className="selected-info">Selected: {selectedPiece.name}</p>
       )}
 
-      {(gameState.game_state === "checkmate" || gameState.game_state === "stalemate") && (
-        <button className="btn btn-primary" style={{ marginTop: "1rem" }} onClick={handleReset}>
-          Reset Game
-        </button>
-      )}
+      {isOver &&
+        (isOnline ? (
+          <div style={{ marginTop: "1rem", textAlign: "center" }}>
+            <p className="selected-info">
+              {gameState.game_state === "checkmate"
+                ? `Checkmate — ${winner} wins`
+                : "Stalemate — draw"}
+            </p>
+            <button className="btn btn-primary" onClick={handleBack}>
+              Back to Menu
+            </button>
+          </div>
+        ) : (
+          <button className="btn btn-primary" style={{ marginTop: "1rem" }} onClick={handleReset}>
+            Reset Game
+          </button>
+        ))}
 
       {promotionData && (
         <div className="promotion-overlay">

@@ -2,13 +2,12 @@ import { useEffect } from "react";
 import { Screen } from "../types";
 
 interface Props {
-  setScreen: (screen: Screen) => void;
   handleBack: () => void;
   connectWebSocket: (onReady: (socket: WebSocket) => void) => void;
   status: string;
 }
 
-export default function OnlineQuickMatchScreen({ setScreen, handleBack, connectWebSocket, status }: Props) {
+export default function OnlineQuickMatchScreen({handleBack, connectWebSocket, status }: Props) {
   useEffect(() => {
     connectWebSocket((socket: WebSocket) => {
       socket.send(JSON.stringify({ type: "quick_match" }));

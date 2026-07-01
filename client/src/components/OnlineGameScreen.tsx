@@ -50,12 +50,12 @@ export default function OnlineGameScreen({
   const isMyTurn = gameState.current_turn === myColor;
 
   const winner = gameState.current_turn === "white" ? "Black" : "White";
-
+  
   return (
     <div className="game-root fade-in">
       <div className="game-header">
         <div>
-          <div className="game-header-title">REGICIDE</div>
+          <div className="game-header-title">Chess</div>
           <div className="game-header-mode">Online · 1v1</div>
         </div>
         <div style={{ display: "flex", gap: "0.75rem" }}>
@@ -123,7 +123,7 @@ export default function OnlineGameScreen({
         </div>
       )}
 
-      {promotionData && (
+      {promotionData && promotionData.color === myColor && (
         <div className="promotion-overlay">
           <div className="promotion-box">
             <div className="promotion-pieces">

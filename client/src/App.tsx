@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import LogRegistration from "./components/LoginRegistration";
-import GameScreen from "./components/GameScreen";
 import OnlineGameScreen from "./components/OnlineGameScreen";
+import OfflineGameScreen from "./components/OfflineGameScreen";
 import MenuScreen from "./components/MenuScreen";
 import OfflineSelectScreen from "./components/OfflineSelectScreen";
 import OnlineSelectScreen from "./components/OnlineSelectScreen";
@@ -19,14 +19,15 @@ const HEADERS = {
   "ngrok-skip-browser-warning": "true",
 };
 
-// If your Piece type already has a `color` field this just returns it.
-// Otherwise adjust to however you encode color (here: image prefix "w"/"b").
 const pieceColor = (piece: Piece): "white" | "black" =>
   (piece as { color?: "white" | "black" }).color ??
-  (piece.image?.startsWith("b") ? "black" : "white");
+  (piece.image?.includes("dark") ? "black" : "white");
 
 export default function App() {
   const ws = useRef<WebSocket | null>(null);
+  const intentionalLeaveRef = useRef(false);
+  const myColorRef = useRef<"white" | "black" | null>(null);
+
   const [screen, setScreen] = useState<Screen>("registration");
   const [onlineStatus, setOnlineStatus] = useState("Connecting...");
   const [pieces, setPieces] = useState<Piece[]>([]);
@@ -36,11 +37,17 @@ export default function App() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loggedIn, setLoggedIn] = useState<boolean>(false);
   const [myColor, setMyColor] = useState<"white" | "black" | null>(null);
+
+  const updateMyColor = (color: "white" | "black" | null) => {
+    myColorRef.current = color;
+    setMyColor(color);
+  };
   const [gameState, setGameState] = useState<{
     game_state: "ongoing" | "checkmate" | "stalemate";
     current_turn: "white" | "black";
   }>({ game_state: "ongoing", current_turn: "white" });
 
+  // ---------- OFFLINE setup ----------
   const handleGameStart = async () => {
     const res = await fetch(`${BASE_URL}/offline/create`, { headers: HEADERS, method: "POST" });
     const data = await res.json();
@@ -53,6 +60,28 @@ export default function App() {
       fetch(`${BASE_URL}/offline/board/${sessionId}`, { headers: HEADERS })
         .then(res => res.json())
         .then(setPieces);
+      return;
+    }
+
+    if (screen === "game-online") {
+      const savedName = localStorage.getItem("name");
+      if (!savedName) return;
+
+      fetch(`${BASE_URL}/online/board?username=${encodeURIComponent(savedName)}`, { headers: HEADERS })
+        .then(res => {
+          if (!res.ok) throw new Error("no active game");
+          return res.json();
+        })
+        .then(data => {
+          if (data.board) setPieces(data.board);
+          if (data.current_turn) {
+            setGameState(prev => ({ ...prev, current_turn: data.current_turn }));
+          }
+          if (data.color) updateMyColor(data.color);
+        })
+        .catch(() => {
+          // WS "game_start" should populate this shortly after; safe to ignore.
+        });
     }
   }, [screen, sessionId]);
 
@@ -67,6 +96,8 @@ export default function App() {
       onReady?.(ws.current);
       return;
     }
+
+    intentionalLeaveRef.current = false;
 
     const socket = new WebSocket(
       `${BASE_URL.replace("https", "wss")}/online/ws?token=skipbrowserwarning`
@@ -89,8 +120,7 @@ export default function App() {
 
       switch (data.type) {
         case "game_start": {
-          // Server tells us our color + the starting position.
-          setMyColor(data.color ?? "white");
+          updateMyColor(data.color ?? "white");
           if (data.board) setPieces(data.board);
           setGameState({
             game_state: "ongoing",
@@ -102,31 +132,48 @@ export default function App() {
           setScreen("game-online");
           break;
         }
+
         case "searching":
           setOnlineStatus("Waiting for an opponent...");
           break;
+
         case "valid_moves":
           setValidMoves(data.moves ?? []);
           break;
-        case "state": // broadcast to BOTH players after every move
-        case "board_update":
+
+        case "state":
+        case "board_update": {
           if (data.board) setPieces(data.board);
-          if (data.game_status) setGameState(data.game_status);
-          else if (data.current_turn)
+          if (data.game_status) {
+            setGameState(data.game_status);
+          } else if (data.current_turn) {
             setGameState(prev => ({ ...prev, current_turn: data.current_turn }));
+          }
           setSelectedPiece(null);
           setValidMoves([]);
-          if (data.promotion?.ok) setPromotionData(data.promotion.data);
+          if (data.promotion?.ok) {
+            const promoColor = data.promotion.data?.color;
+            console.log("[PROMO]", { promoColor, myColor: myColorRef.current, data: data.promotion.data });
+            if (!promoColor || promoColor === myColorRef.current) {
+              setPromotionData(data.promotion.data);
+            }
+          }
           break;
+        }
+
         case "promotion":
           setPromotionData(data.data);
           break;
+
         case "game_over":
           setGameState({
             game_state: data.result ?? "checkmate",
             current_turn: data.current_turn ?? "white",
           });
+          setSelectedPiece(null);
+          setValidMoves([]);
           break;
+
         case "error":
           setOnlineStatus(data.message);
           break;
@@ -134,7 +181,10 @@ export default function App() {
     });
 
     socket.addEventListener("close", () => {
-      console.log("Disconnected");
+      if (intentionalLeaveRef.current) {
+        intentionalLeaveRef.current = false;
+        return;
+      }
       setTimeout(() => {
         const savedName = localStorage.getItem("name");
         if (savedName) connectWebSocket();
@@ -151,7 +201,7 @@ export default function App() {
       .then(res => res.json())
       .then(setPieces);
 
-  // ---------- OFFLINE handlers (unchanged) ----------
+  // ---------- OFFLINE handlers ----------
   const handleSquareClick = async (row: number, col: number) => {
     if (!selectedPiece) return;
     const isValid = validMoves.some(move => move.x === col && move.y === row);
@@ -196,7 +246,10 @@ export default function App() {
       body: JSON.stringify({ x: promotionData.x, y: promotionData.y, piece: pieceName }),
     })
       .then(res => res.json())
-      .then(() => { setPromotionData(null); refreshBoard(); });
+      .then(() => {
+        setPromotionData(null);
+        refreshBoard();
+      });
   };
 
   const handlePieceClick = (piece: Piece) => {
@@ -226,8 +279,8 @@ export default function App() {
   const isMyTurn = myColor !== null && gameState.current_turn === myColor;
 
   const handleOnlinePieceClick = (piece: Piece) => {
-    if (!isMyTurn) return;                    // not your turn
-    if (pieceColor(piece) !== myColor) return; // not your piece
+    if (!isMyTurn) return;
+    if (pieceColor(piece) !== myColor) return;
     setSelectedPiece(piece);
     setValidMoves([]);
     sendWS({ type: "valid_moves", piece });
@@ -238,8 +291,6 @@ export default function App() {
     const isValid = validMoves.some(move => move.x === col && move.y === row);
     if (!isValid) return;
 
-    // Server is authoritative: we only send the move and wait for the
-    // "state" broadcast. No optimistic board mutation -> no desync.
     sendWS({ type: "move", from: [selectedPiece.x, selectedPiece.y], to: [col, row] });
     setSelectedPiece(null);
     setValidMoves([]);
@@ -251,6 +302,7 @@ export default function App() {
     setPromotionData(null);
   };
 
+  // ---------- Navigation ----------
   const handleBack = () => {
     if (screen === "game-offline") {
       fetch(`${BASE_URL}/offline/end/${sessionId}`, { method: "DELETE", headers: HEADERS });
@@ -259,25 +311,42 @@ export default function App() {
       setPieces([]);
       setSelectedPiece(null);
       setValidMoves([]);
-    } else if (screen === "game-online") {
+      return;
+    }
+
+    if (screen === "game-online") {
+      intentionalLeaveRef.current = true;
       sendWS({ type: "leave" });
+      ws.current?.close();
       setScreen("menu");
       setPieces([]);
       setSelectedPiece(null);
       setValidMoves([]);
       setPromotionData(null);
-      setMyColor(null);
-    } else if (screen === "offline-setup" || screen === "online-setup") {
+      updateMyColor(null);
+      return;
+    }
+
+    if (screen === "offline-setup" || screen === "online-setup") {
       setScreen("menu");
-    } else if (screen === "online-private") {
+      return;
+    }
+
+    if (screen === "online-private") {
       setScreen("online-setup");
-    } else if (
+      return;
+    }
+
+    if (
       screen === "online-create-lobby" ||
       screen === "online-join-lobby" ||
       screen === "online-quick-match"
     ) {
       setScreen("online-private");
-    } else if (screen === "menu") {
+      return;
+    }
+
+    if (screen === "menu") {
       setLoggedIn(false);
       setScreen("registration");
     }
@@ -312,7 +381,6 @@ export default function App() {
 
       {screen === "online-quick-match" && (
         <OnlineQuickMatchScreen
-          setScreen={setScreen}
           handleBack={handleBack}
           connectWebSocket={connectWebSocket}
           status={onlineStatus}
@@ -328,7 +396,7 @@ export default function App() {
       )}
 
       {screen === "game-offline" && (
-        <GameScreen
+        <OfflineGameScreen
           pieces={pieces}
           selectedPiece={selectedPiece}
           validMoves={validMoves}

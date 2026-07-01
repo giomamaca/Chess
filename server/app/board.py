@@ -33,9 +33,10 @@ class Board:
 
     def move_piece(self, piece, new_x, new_y):
         target = self.grid[new_y][new_x]
+        castled = False
+
         if "king" in piece.get_name() and piece.first_move:
             if new_x == 6:
-                print("new_x  = 6")
                 rook = self.get_piece(7, piece.y)
                 if rook and "rook" in rook.get_name() and rook.first_move:
                     self.grid[piece.y][7] = None
@@ -44,23 +45,24 @@ class Board:
                     self.grid[piece.y][6] = piece
                     self.grid[piece.y][4] = None
                     piece.update_position(6, piece.y)
-                    return
-            if new_x == 2 and rook.first_move:
-                print("new_x = 2")
+                    castled = True
+            elif new_x == 2:
                 rook = self.get_piece(0, piece.y)
-                if rook and "rook" in rook.get_name():
+                if rook and "rook" in rook.get_name() and rook.first_move:
                     self.grid[piece.y][0] = None
                     rook.update_position(3, piece.y)
                     self.grid[piece.y][3] = rook
                     self.grid[piece.y][2] = piece
                     self.grid[piece.y][4] = None
                     piece.update_position(2, piece.y)
-                    return
+                    castled = True
+
+        if castled:
+            self.current_turn = "black" if self.current_turn == "white" else "white"
+            return
 
         if target is not None:
             if target in self.pieces:
-                print(new_x, new_y)
-                print(target.get_name())
                 self.pieces.remove(target)
 
         self.grid[piece.y][piece.x] = None
@@ -77,6 +79,7 @@ class Board:
                     return {
                         "x": piece.x,
                         "y": piece.y,
+                        "color": "white",
                         "offers": [
                             {"name": "queen",  "image": self.get_image_path("white", "queen")},
                             {"name": "rook",   "image": self.get_image_path("white", "rook")},
@@ -91,6 +94,7 @@ class Board:
                     return {
                         "x": piece.x,
                         "y": piece.y,
+                        "color": "black",
                         "offers": [
                             {"name": "queen",  "image": self.get_image_path("black", "queen")},
                             {"name": "rook",   "image": self.get_image_path("black", "rook")},
