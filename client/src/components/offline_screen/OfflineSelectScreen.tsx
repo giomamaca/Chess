@@ -1,4 +1,4 @@
-import { Screen } from "../types";
+import { Screen } from "../../types";
 
 interface Props {
   handleBack: () => void;

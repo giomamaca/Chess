@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Screen } from "../types";
+import { Screen } from "../../types";
 
 interface Props {
   setScreen: (screen: Screen) => void;
   handleBack: () => void;
-  connectWebSocket: (onReady: (socket: WebSocket) => void) => void;
+  connectWebSocket: (onReady?: (socket: WebSocket) => void) => void;
 }
 
 export default function OnlineJoinScreen({ setScreen, handleBack, connectWebSocket }: Props) {
@@ -14,18 +14,28 @@ export default function OnlineJoinScreen({ setScreen, handleBack, connectWebSock
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
+    let cleanup: (() => void) | undefined;
+
     connectWebSocket((socket: WebSocket) => {
       socketRef.current = socket;
 
-      socket.addEventListener("message", (event: MessageEvent) => {
-        const data = JSON.parse(event.data);
-        if (data.type === "game_start") setScreen("game-online");
-        if (data.type === "error") {
-          setStatus(data.message);
-          setSearching(false);
+      const onMessage = (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "error") {
+            setStatus(data.message);
+            setSearching(false);
+          }
+        } catch {
+          /* ignore malformed frames */
         }
-      });
+      };
+
+      socket.addEventListener("message", onMessage);
+      cleanup = () => socket.removeEventListener("message", onMessage);
     });
+
+    return () => cleanup?.();
   }, []);
 
   const handleJoinPrivate = () => {
@@ -34,7 +44,7 @@ export default function OnlineJoinScreen({ setScreen, handleBack, connectWebSock
     setStatus("Joining room...");
     socketRef.current.send(JSON.stringify({
       type: "join_private_room",
-      room_code: code.trim().toUpperCase()
+      room_code: code.trim().toUpperCase(),
     }));
   };
 

@@ -1,6 +1,6 @@
-import ChessBoard from "./ChessBoard";
-import { Piece } from "../App";
-import { Screen } from "../types";
+import ChessBoard from "../game_components/ChessBoard";
+import { Piece } from "../../App";
+import { Screen } from "../../types";
 
 type Move = { x: number; y: number };
 type PromotionOffer = { name: string; image: string };

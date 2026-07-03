@@ -1,5 +1,5 @@
 import Square from "./Square";
-import { Piece } from "../App";
+import { Piece } from "../../App";
 
 interface Props {
   pieces: Piece[];

@@ -4,10 +4,10 @@ export type Screen =
   | "offline-setup"
   | "online-setup"
   | "online-private"
-  | "online-create-lobby"
-  | "online-join-lobby"
   | "online-quick-match"
+  | "online-join-private-match"
   | "online-waiting-room"
+  | "online-private-created"
   | "game-offline"
   | "game-online";
 

@@ -1,4 +1,4 @@
-import { Screen } from "../types";
+import { Screen } from "../../types";
 
 interface Props {
   setScreen: (screen: Screen) => void;
@@ -17,14 +17,14 @@ export default function OnlinePrivateSelectScreen({ setScreen, handleBack }: Pro
         <button
           className="btn btn-primary"
           style={{ width: "220px" }}
-          onClick={() => setScreen("online-create-lobby")}
+          onClick={() => setScreen("online-private-created")}
         >
           Create Room
         </button>
         <button
           className="btn btn-secondary"
           style={{ width: "220px" }}
-          onClick={() => setScreen("online-join-lobby")}
+          onClick={() => setScreen("online-join-private-match")}
         >
           Join Room
         </button>

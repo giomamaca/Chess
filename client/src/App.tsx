@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import LogRegistration from "./components/LoginRegistration";
-import OnlineGameScreen from "./components/OnlineGameScreen";
-import OfflineGameScreen from "./components/OfflineGameScreen";
+import LogRegistration from "./components/login_screen/LoginRegistration";
+import OnlineGameScreen from "./components/online_screens/OnlineGameScreen";
+import OfflineGameScreen from "./components/offline_screen/OfflineGameScreen";
 import MenuScreen from "./components/MenuScreen";
-import OfflineSelectScreen from "./components/OfflineSelectScreen";
-import OnlineSelectScreen from "./components/OnlineSelectScreen";
-import OnlinePrivateSelectScreen from "./components/OnlinePrivateSelectScreen";
-import OnlineJoinScreen from "./components/OnlineJoinScreen";
-import OnlineQuickMatchScreen from "./components/OnlineQuickMatchScreen";
+import OfflineSelectScreen from "./components/offline_screen/OfflineSelectScreen";
+import OnlineSelectScreen from "./components/online_screens/OnlineSelectScreen";
+import OnlinePrivateSelectScreen from "./components/online_screens/OnlinePrivateSelectScreen";
+import OnlinePrivateMatchCreatedScreen from "./components/online_screens/loading_screens/OnlinePrivateMatchCreatedScreen";
+import OnlineJoinScreen from "./components/online_screens/OnlineJoinScreen";
+import OnlineQuickMatchScreen from "./components/online_screens/loading_screens/OnlineQuickMatchScreen";
 import { Screen, Piece, Move, PromotionData } from "./types";
 import BASE_URL from "./config";
 import styles from "./styles";
@@ -37,15 +38,16 @@ export default function App() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loggedIn, setLoggedIn] = useState<boolean>(false);
   const [myColor, setMyColor] = useState<"white" | "black" | null>(null);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [gameState, setGameState] = useState<{
+    game_state: "ongoing" | "checkmate" | "stalemate";
+    current_turn: "white" | "black";
+  }>({ game_state: "ongoing", current_turn: "white" });
 
   const updateMyColor = (color: "white" | "black" | null) => {
     myColorRef.current = color;
     setMyColor(color);
   };
-  const [gameState, setGameState] = useState<{
-    game_state: "ongoing" | "checkmate" | "stalemate";
-    current_turn: "white" | "black";
-  }>({ game_state: "ongoing", current_turn: "white" });
 
   // ---------- OFFLINE setup ----------
   const handleGameStart = async () => {
@@ -133,6 +135,13 @@ export default function App() {
           break;
         }
 
+        case "room_created": {
+          setOnlineStatus("Waiting for an opponent...");
+          if (data.room_code) setRoomCode(data.room_code);
+          setScreen("online-private-created");
+          break;
+        }
+
         case "searching":
           setOnlineStatus("Waiting for an opponent...");
           break;
@@ -153,7 +162,6 @@ export default function App() {
           setValidMoves([]);
           if (data.promotion?.ok) {
             const promoColor = data.promotion.data?.color;
-            console.log("[PROMO]", { promoColor, myColor: myColorRef.current, data: data.promotion.data });
             if (!promoColor || promoColor === myColorRef.current) {
               setPromotionData(data.promotion.data);
             }
@@ -338,10 +346,11 @@ export default function App() {
     }
 
     if (
-      screen === "online-create-lobby" ||
-      screen === "online-join-lobby" ||
+      screen === "online-private-created" ||
+      screen === "online-join-private-match" ||
       screen === "online-quick-match"
     ) {
+      setRoomCode(null);
       setScreen("online-private");
       return;
     }
@@ -376,7 +385,19 @@ export default function App() {
       )}
 
       {screen === "online-private" && (
-        <OnlinePrivateSelectScreen setScreen={setScreen} handleBack={handleBack} />
+        <OnlinePrivateSelectScreen
+          setScreen={setScreen}
+          handleBack={handleBack}
+        />
+      )}
+
+      {screen === "online-private-created" && (
+        <OnlinePrivateMatchCreatedScreen
+          roomCode={roomCode}
+          status={onlineStatus}
+          handleBack={handleBack}
+          connectWebSocket={connectWebSocket}
+        />
       )}
 
       {screen === "online-quick-match" && (
@@ -387,7 +408,7 @@ export default function App() {
         />
       )}
 
-      {screen === "online-join-lobby" && (
+      {screen === "online-join-private-match" && (
         <OnlineJoinScreen
           setScreen={setScreen}
           handleBack={handleBack}

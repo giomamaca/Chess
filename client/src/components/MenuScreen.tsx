@@ -18,7 +18,7 @@ export default function MenuScreen({ setScreen, setLoggedIn }: Props) {
         </button>
       </div>
       <div className="chess-crown">♛</div>
-      <h1 className="game-title">REGICIDE</h1>
+      <h1 className="game-title">Chess</h1>
       <p className="game-subtitle">A Chess Experience</p>
       <div className="divider" />
       <div className="btn-group">

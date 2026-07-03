@@ -1,6 +1,6 @@
 import { useState } from "react";
-import BASE_URL from "../config";
-import {Screen} from "../types"
+import BASE_URL from "../../config";
+import { Screen } from "../../types";
 
 interface Props {
   setLoggedIn: (value: boolean) => void;

@@ -1,5 +1,5 @@
 import PieceComponent from "./Piece";
-import { Piece } from "../App";
+import { Piece } from "../../App";
 
 interface Props {
   x: number;

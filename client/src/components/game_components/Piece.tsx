@@ -1,4 +1,4 @@
-import { Piece } from "../App";
+import { Piece } from "../../App";
 
 interface Props {
   piece: Piece;
