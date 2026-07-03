@@ -1,10 +1,13 @@
+import { useEffect, useRef, useState } from "react";
 import ChessBoard from "../game_components/ChessBoard";
 import { Piece } from "../../App";
 import { Screen } from "../../types";
+import Chat  from "../game_components/Chat";
 
 type Move = { x: number; y: number };
 type PromotionOffer = { name: string; image: string };
 type PromotionData = { x: number; y: number; color: string; offers: PromotionOffer[] };
+type ChatMessage = { sender: string; text: string };
 
 interface Props {
   pieces: Piece[];
@@ -16,6 +19,8 @@ interface Props {
   };
   promotionData: PromotionData | null;
   myColor: "white" | "black" | null;
+  chatMessages: ChatMessage[];
+  sendChatMessage: (text: string) => void;
   handleBack: () => void;
   handleSquareClick: (row: number, col: number) => void;
   handlePieceClick: (piece: Piece) => void;
@@ -34,6 +39,8 @@ export default function OnlineGameScreen({
   gameState,
   promotionData,
   myColor,
+  chatMessages,
+  sendChatMessage,
   handleBack,
   handleSquareClick,
   handlePieceClick,
@@ -50,7 +57,23 @@ export default function OnlineGameScreen({
   const isMyTurn = gameState.current_turn === myColor;
 
   const winner = gameState.current_turn === "white" ? "Black" : "White";
-  
+
+  // ---------- Chat ----------
+  const [draft, setDraft] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const myName = localStorage.getItem("name");
+
+  // Keep the newest message in view
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  const handleSend = () => {
+    if (!draft.trim()) return;
+    sendChatMessage(draft);
+    setDraft("");
+  };
+
   return (
     <div className="game-root fade-in">
       <div className="game-header">
@@ -82,46 +105,53 @@ export default function OnlineGameScreen({
         </div>
       </div>
 
-      {myColor && (
-        <div
-          style={{
-            textAlign: "center",
-            margin: "0.5rem 0",
-            fontSize: "0.85rem",
-            letterSpacing: "0.05em",
-            opacity: isMyTurn || isOver ? 1 : 0.6,
-          }}
-        >
-          You are {myColor === "white" ? "White" : "Black"} ·{" "}
-          {isOver ? "Game over" : isMyTurn ? "Your move" : "Opponent's move"}
+      <div className="game-layout">
+        {/* ---------- Left column: board ---------- */}
+        <div className="game-board-area">
+          {myColor && (
+            <div
+              style={{
+                textAlign: "center",
+                margin: "0 0 0.75rem",
+                fontSize: "0.85rem",
+                letterSpacing: "0.05em",
+                opacity: isMyTurn || isOver ? 1 : 0.6,
+              }}
+            >
+              You are {myColor === "white" ? "White" : "Black"} ·{" "}
+              {isOver ? "Game over" : isMyTurn ? "Your move" : "Opponent's move"}
+            </div>
+          )}
+
+          <ChessBoard
+            pieces={pieces}
+            selectedPiece={selectedPiece}
+            validMoves={validMoves}
+            onSquareClick={handleSquareClick}
+            onPieceClick={handlePieceClick}
+            flipped={flipped}
+          />
+
+          {selectedPiece && (
+            <p className="selected-info">Selected: {selectedPiece.name}</p>
+          )}
+
+          {isOver && (
+            <div style={{ marginTop: "1rem", textAlign: "center" }}>
+              <p className="selected-info">
+                {gameState.game_state === "checkmate"
+                  ? `Checkmate — ${winner} wins`
+                  : "Stalemate — draw"}
+              </p>
+              <button className="btn btn-primary" onClick={handleBack}>
+                Back to Menu
+              </button>
+            </div>
+          )}
         </div>
-      )}
 
-      <ChessBoard
-        pieces={pieces}
-        selectedPiece={selectedPiece}
-        validMoves={validMoves}
-        onSquareClick={handleSquareClick}
-        onPieceClick={handlePieceClick}
-        flipped={flipped}
-      />
-
-      {selectedPiece && (
-        <p className="selected-info">Selected: {selectedPiece.name}</p>
-      )}
-
-      {isOver && (
-        <div style={{ marginTop: "1rem", textAlign: "center" }}>
-          <p className="selected-info">
-            {gameState.game_state === "checkmate"
-              ? `Checkmate — ${winner} wins`
-              : "Stalemate — draw"}
-          </p>
-          <button className="btn btn-primary" onClick={handleBack}>
-            Back to Menu
-          </button>
-        </div>
-      )}
+      <Chat chatMessages={chatMessages} sendChatMessage={sendChatMessage} />
+      </div>
 
       {promotionData && promotionData.color === myColor && (
         <div className="promotion-overlay">

@@ -3,15 +3,22 @@ const styles = `
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* Reserve the scrollbar's space at all times so the layout doesn't
+     jump left when content grows tall enough to scroll (e.g. when the
+     "Selected: ..." line appears after clicking a piece). */
+  html {
+    scrollbar-gutter: stable;
+  }
+
   :root {
-    --ink:        #0a0908;   /* near-black stage */
-    --panel:      #150f08;   /* raised panel / box */
-    --brass:      #c9a227;   /* muted antique gold — primary accent */
-    --brass-hi:   #e8c95a;   /* brighter brass for hover states */
-    --parchment:  #e9dcc3;   /* body text */
-    --parchment-dim: #8c7c5e; /* secondary / muted text */
-    --line:       #2c2213;   /* hairline borders */
-    --garnet:     #9c4a3e;   /* sign-out / danger accent */
+    --ink:           #0a0908;   /* near-black stage */
+    --panel:         #150f08;   /* raised panel / box */
+    --brass:         #c9a227;   /* muted antique gold — primary accent */
+    --brass-hi:      #e8c95a;   /* brighter brass for hover states */
+    --parchment:     #e9dcc3;   /* body text */
+    --parchment-dim: #8c7c5e;   /* secondary / muted text */
+    --line:          #2c2213;   /* hairline borders */
+    --garnet:        #9c4a3e;   /* sign-out / danger accent */
   }
 
   body {
@@ -42,7 +49,6 @@ const styles = `
     padding: 2rem 1.5rem;
   }
 
-  /* faint engraved board grid across the whole stage */
   .menu-root::before {
     content: '';
     position: absolute;
@@ -54,8 +60,6 @@ const styles = `
     pointer-events: none;
   }
 
-  /* signature element: an oversized, near-invisible knight watermark
-     anchored to the corner — reads as engraved stone, not decoration */
   .menu-root::after {
     content: '♞';
     position: absolute;
@@ -116,7 +120,6 @@ const styles = `
     z-index: 1;
   }
 
-  /* small inlay diamond at the divider's center, echoing a board square */
   .divider::before {
     content: '';
     position: absolute;
@@ -262,7 +265,7 @@ const styles = `
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 1.5rem 1rem 3rem;
+    padding: 1.5rem 1.5rem 3rem;
   }
 
   .game-header {
@@ -272,7 +275,7 @@ const styles = `
     flex-wrap: wrap;
     gap: 0.75rem;
     width: 100%;
-    max-width: 700px;
+    max-width: 1200px;
     padding: 0 0.5rem 1rem;
     border-bottom: 1px solid rgba(201,162,39,0.15);
     margin-bottom: 1.5rem;
@@ -291,6 +294,151 @@ const styles = `
     font-style: italic;
     font-size: 0.9rem;
     color: var(--parchment-dim);
+  }
+
+  /* two-column stage: board (left) + side panel e.g. chat (right).
+     Falls back to stacked layout on narrow screens. */
+  .game-layout {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2rem;
+    width: 100%;
+    max-width: 1200px;
+  }
+
+  .game-board-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+
+  /* ---------- Chat panel (right column) ---------- */
+
+  .chat-panel {
+    flex: 1 1 320px;
+    max-width: 380px;
+    min-width: 260px;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 0 0 1px rgba(201,162,39,0.05);
+    position: relative;
+  }
+
+  /* brass corner ticks — same motif as the promotion box */
+  .chat-panel::before,
+  .chat-panel::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--brass);
+    pointer-events: none;
+  }
+  .chat-panel::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .chat-panel::after  { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+  .chat-panel-header {
+    font-family: 'Cinzel', serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--brass);
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid var(--line);
+    background: rgba(201,162,39,0.03);
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    min-height: 240px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+
+  .chat-messages::-webkit-scrollbar { width: 6px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--line); }
+
+  .chat-message {
+    max-width: 85%;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.92rem;
+    line-height: 1.4;
+    background: rgba(201,162,39,0.05);
+    border: 1px solid var(--line);
+    color: var(--parchment);
+    align-self: flex-start;
+    clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+    word-break: break-word;
+  }
+
+  .chat-message.own {
+    align-self: flex-end;
+    background: rgba(201,162,39,0.13);
+    border-color: rgba(201,162,39,0.35);
+  }
+
+  .chat-message-author {
+    display: block;
+    font-family: 'Cinzel', serif;
+    font-size: 0.55rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--parchment-dim);
+    margin-bottom: 0.2rem;
+  }
+
+  .chat-input-row {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-top: 1px solid var(--line);
+    background: rgba(201,162,39,0.02);
+  }
+
+  .chat-input {
+    flex: 1;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    padding: 0.55rem 0.8rem;
+    color: var(--parchment);
+    font-family: 'Crimson Text', serif;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s ease;
+  }
+
+  .chat-input:focus { border-color: rgba(201,162,39,0.5); }
+  .chat-input::placeholder { color: #56492f; font-style: italic; }
+
+  .chat-send-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 0.55rem 1rem;
+    background: rgba(201,162,39,0.08);
+    color: var(--brass);
+    border: 1px solid rgba(201,162,39,0.4);
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+  }
+
+  .chat-send-btn:hover {
+    background: rgba(201,162,39,0.16);
+    border-color: var(--brass);
   }
 
   .selected-info {
@@ -336,7 +484,6 @@ const styles = `
     position: relative;
   }
 
-  /* brass corner ticks — echoes the clip-path notch used on buttons */
   .promotion-box::before,
   .promotion-box::after {
     content: '';
@@ -401,15 +548,6 @@ const styles = `
     text-transform: uppercase;
   }
 
-  /* ---------- Small screens ---------- */
-
-  @media (max-width: 480px) {
-    .chess-crown { font-size: 2.8rem; }
-    .game-subtitle { letter-spacing: 0.22em; }
-    .btn { padding: 0.85rem 1.4rem; font-size: 0.82rem; }
-    .promotion-box { padding: 1.5rem 1.25rem; }
-    .promotion-piece-btn img { width: 46px; height: 46px; }
-  }
   /* ---------- Private match waiting screen ---------- */
 
   .waiting-spinner {
@@ -452,8 +590,6 @@ const styles = `
     color: var(--parchment-dim);
   }
 
-  /* each character sits in its own tile — echoes chessboard squares
-     and keeps the code visually separated from the label */
   .room-code-chip {
     display: flex;
     gap: 0.45rem;
@@ -475,7 +611,6 @@ const styles = `
     user-select: all;
   }
 
-  /* alternate tile shading — subtle board-square rhythm */
   .room-code-char:nth-child(even) {
     background: rgba(201,162,39,0.11);
   }
@@ -486,7 +621,27 @@ const styles = `
     margin-top: 0.15rem;
   }
 
+  /* ---------- Responsive ---------- */
+
+  /* Chat drops below the board once side-by-side no longer fits */
+  @media (max-width: 1024px) {
+    .game-layout {
+      flex-direction: column;
+      align-items: center;
+    }
+    .chat-panel {
+      width: 100%;
+      max-width: 640px;
+      min-height: 300px;
+    }
+  }
+
   @media (max-width: 480px) {
+    .chess-crown { font-size: 2.8rem; }
+    .game-subtitle { letter-spacing: 0.22em; }
+    .btn { padding: 0.85rem 1.4rem; font-size: 0.82rem; }
+    .promotion-box { padding: 1.5rem 1.25rem; }
+    .promotion-piece-btn img { width: 46px; height: 46px; }
     .waiting-spinner { width: 64px; height: 64px; }
     .room-code-box { padding: 1.35rem 1.25rem 1.2rem; }
     .room-code-chip { gap: 0.3rem; }

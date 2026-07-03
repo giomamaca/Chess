@@ -39,6 +39,7 @@ export default function App() {
   const [loggedIn, setLoggedIn] = useState<boolean>(false);
   const [myColor, setMyColor] = useState<"white" | "black" | null>(null);
   const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<{ sender: string; text: string }[]>([]);
   const [gameState, setGameState] = useState<{
     game_state: "ongoing" | "checkmate" | "stalemate";
     current_turn: "white" | "black";
@@ -83,6 +84,18 @@ export default function App() {
         })
         .catch(() => {
           // WS "game_start" should populate this shortly after; safe to ignore.
+        });
+
+      fetch(`${BASE_URL}/online/chat?username=${encodeURIComponent(savedName)}`, { headers: HEADERS })
+        .then(res => {
+          if (!res.ok) throw new Error("no chat history");
+          return res.json();
+        })
+        .then(data => {
+          if (Array.isArray(data.messages)) setChatMessages(data.messages);
+        })
+        .catch(() => {
+          // No active game yet or empty history — nothing to restore.
         });
     }
   }, [screen, sessionId]);
@@ -131,9 +144,16 @@ export default function App() {
           setSelectedPiece(null);
           setValidMoves([]);
           setPromotionData(null);
+          setChatMessages([]);
           setScreen("game-online");
           break;
         }
+
+        case "chat":
+          if (data.text) {
+            setChatMessages(prev => [...prev, { sender: data.sender ?? "?", text: data.text }]);
+          }
+          break;
 
         case "room_created": {
           setOnlineStatus("Waiting for an opponent...");
@@ -310,6 +330,12 @@ export default function App() {
     setPromotionData(null);
   };
 
+  const sendChatMessage = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    sendWS({ type: "chat", text: trimmed });
+  };
+
   // ---------- Navigation ----------
   const handleBack = () => {
     if (screen === "game-offline") {
@@ -331,6 +357,7 @@ export default function App() {
       setSelectedPiece(null);
       setValidMoves([]);
       setPromotionData(null);
+      setChatMessages([]);
       updateMyColor(null);
       return;
     }
@@ -346,9 +373,10 @@ export default function App() {
     }
 
     if (
-      screen === "online-private-created" ||
       screen === "online-join-private-match" ||
-      screen === "online-quick-match"
+      screen === "online-quick-match" ||
+      screen === "online-private-created" ||
+      screen === "online-waiting-room"
     ) {
       setRoomCode(null);
       setScreen("online-private");
@@ -444,6 +472,8 @@ export default function App() {
           gameState={gameState}
           promotionData={promotionData}
           myColor={myColor}
+          chatMessages={chatMessages}
+          sendChatMessage={sendChatMessage}
           handleBack={handleBack}
           handleSquareClick={handleOnlineSquareClick}
           handlePieceClick={handleOnlinePieceClick}
