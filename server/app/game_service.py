@@ -3,6 +3,22 @@ from .move_generator import MoveGenerator
 from .rules_engine import RulesEngine
 
 
+def _status(game: dict) -> dict:
+    """Game state plus, on a checkmate, who actually won. Computed once —
+    working out the state means generating every legal move."""
+    rules_engine = game["rules_engine"]
+    state = rules_engine.get_game_state()
+    current_turn = game["board"].current_turn
+
+    return {
+        "game_state": state,
+        "current_turn": current_turn,
+        # The mated side is the one to move, so the winner is the other one.
+        "winner": ("black" if current_turn == "white" else "white")
+                  if state == "checkmate" else None,
+    }
+
+
 def create_game(board: Board | None = None) -> dict:
     board = board if board is not None else Board()
     move_generator = MoveGenerator(board)
@@ -40,10 +56,7 @@ def make_move(game: dict, fx: int, fy: int, tx: int, ty: int) -> dict:
     return {
         "ok": True,
         "board": board.board_to_json(),
-        "game_status": {
-            "game_state": rules_engine.get_game_state(),
-            "current_turn": board.current_turn,
-        },
+        "game_status": _status(game),
         "promotion": {
             "ok": bool(promotion_raw),
             "data": promotion_raw,
@@ -57,7 +70,4 @@ def promote_pawn(game: dict, x: int, y: int, piece_name: str) -> dict:
 
 
 def get_status(game: dict) -> dict:
-    return {
-        "game_state": game["rules_engine"].get_game_state(),
-        "current_turn": game["board"].current_turn,
-    }
+    return _status(game)

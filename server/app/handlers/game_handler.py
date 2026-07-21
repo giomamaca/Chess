@@ -1,7 +1,11 @@
+import asyncio
 import json
 from fastapi import WebSocket
 
 from .. import game_service
+
+# How long a player who drops out has to reconnect before forfeiting.
+ABANDON_SECONDS = 120
 
 
 class GameHandlers:
@@ -10,6 +14,8 @@ class GameHandlers:
         self.user_repo = user_repo
         self.connected_users = connected_users
         self.board_from_game_id = board_from_game_id
+        # username -> {"task", "game_id", "opponent"} while a grace period runs.
+        self.abandon_timers: dict = {}
 
     def _game_start_payload(self, game_id, code, color, game):
         board = game["board"]
@@ -99,6 +105,21 @@ class GameHandlers:
                     self._game_start_payload(game_id, code, host_color, game)
                 ))
         else:
+            # Reuse a lobby this player already owns instead of stacking up a
+            # new one every time the search screen mounts.
+            own_lobby = next(
+                (g for g in self.game_repo.get_pending_games_by_player(user_id)
+                 if g[4] == "waiting"),
+                None
+            )
+            if own_lobby:
+                await websocket.send_text(json.dumps({
+                    "type": "searching",
+                    "game_id": own_lobby[0],
+                    "code": own_lobby[1]
+                }))
+                return
+
             board, game_id, code = self.game_repo.create_open_game(user_id)
             await websocket.send_text(json.dumps({
                 "type": "searching",
@@ -106,3 +127,95 @@ class GameHandlers:
                 "code": code
             }))
             self.board_from_game_id[game_id] = game_service.create_game(board)
+
+    async def handle_cancel_lobby(self, username: str):
+        """Player backed out of a waiting room before anyone joined — drop it."""
+        user = self.user_repo.get_user_by_username(username)
+        if not user:
+            return
+
+        for game_row in self.game_repo.get_pending_games_by_player(user[0]):
+            self.game_repo.remove_game(game_row[0])
+            self.board_from_game_id.pop(game_row[0], None)
+
+    async def handle_leave(self, username: str, game_id, opponent_username,
+                           message: str = None):
+        """Player walked out of a live game — end it for both sides.
+
+        The game is deleted rather than marked finished: an abandoned match has
+        nothing worth keeping, and the row's chat history goes with it via
+        ON DELETE CASCADE."""
+        if game_id is None:
+            return
+
+        # Whoever is still here doesn't need a grace period any more.
+        self.cancel_abandon_timer(username)
+        self.cancel_abandon_timer(opponent_username)
+
+        opponent_socket = self.connected_users.get(opponent_username)
+        if opponent_socket:
+            await opponent_socket.send_text(json.dumps({
+                "type": "opponent_left",
+                "message": message or f"{username} left the match.",
+            }))
+
+        self.game_repo.remove_game(game_id)
+        self.board_from_game_id.pop(game_id, None)
+
+    # ---------- Dropped connections ----------
+
+    async def handle_disconnect(self, username: str, game_id, opponent_username):
+        """Player vanished without pressing Leave — maybe a refresh, maybe a
+        dead network. Tell the opponent and start the forfeit clock."""
+        if game_id is None or username in self.abandon_timers:
+            return
+
+        opponent_socket = self.connected_users.get(opponent_username)
+        if opponent_socket:
+            await opponent_socket.send_text(json.dumps({
+                "type": "opponent_disconnected",
+                "seconds": ABANDON_SECONDS,
+            }))
+
+        self.abandon_timers[username] = {
+            "task": asyncio.create_task(
+                self._forfeit_after_grace(username, game_id, opponent_username)
+            ),
+            "game_id": game_id,
+            "opponent": opponent_username,
+        }
+
+    async def _forfeit_after_grace(self, username: str, game_id, opponent_username):
+        try:
+            await asyncio.sleep(ABANDON_SECONDS)
+        except asyncio.CancelledError:
+            return
+
+        self.abandon_timers.pop(username, None)
+        await self.handle_leave(
+            username, game_id, opponent_username,
+            message=f"{username} did not return in time.",
+        )
+
+    def cancel_abandon_timer(self, username: str) -> bool:
+        """Stops a running forfeit clock. Returns whether one was in flight."""
+        timer = self.abandon_timers.pop(username, None)
+        if not timer:
+            return False
+        timer["task"].cancel()
+        return True
+
+    async def handle_reconnect(self, username: str):
+        """Player made it back before the clock ran out."""
+        timer = self.abandon_timers.get(username)
+        if not timer:
+            return
+
+        opponent_username = timer["opponent"]
+        self.cancel_abandon_timer(username)
+
+        opponent_socket = self.connected_users.get(opponent_username)
+        if opponent_socket:
+            await opponent_socket.send_text(json.dumps({
+                "type": "opponent_reconnected",
+            }))

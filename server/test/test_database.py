@@ -1,18 +1,17 @@
 import pytest
 from unittest.mock import MagicMock, patch
 import bcrypt
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+USER_REPO = "db.repositories.user_repository.get_connection"
+GAME_REPO = "db.repositories.game_repository.get_connection"
 
 
 # ── AuthService tests ──────────────────────────────────────────────
 
 class TestAuthService:
     def setup_method(self):
-        with patch("db.user_repositories.get_connection"), \
-             patch("db.init_db.get_connection"):
-            from db.auth_service import AuthService
-            self.auth = AuthService()
+        from db.auth_service import AuthService
+        self.auth = AuthService()
 
     def test_register_success(self):
         self.auth.repo.get_user_by_username = MagicMock(return_value=None)
@@ -61,17 +60,15 @@ class TestAuthService:
 
 class TestUserRepository:
     def setup_method(self):
-        with patch("db.init_db.get_connection"), \
-             patch("db.user_repositories.get_connection"):
-            from db.user_repositories import UserRepository
-            self.repo = UserRepository()
+        from db.repositories.user_repository import UserRepository
+        self.repo = UserRepository()
 
     def test_create_user(self):
         mock_conn = MagicMock()
         mock_cur = MagicMock()
         mock_conn.cursor.return_value = mock_cur
 
-        with patch("db.user_repositories.get_connection", return_value=mock_conn):
+        with patch(USER_REPO, return_value=mock_conn):
             self.repo.create_user("alice", "hashed_pw")
 
         mock_cur.execute.assert_called_once()
@@ -86,7 +83,7 @@ class TestUserRepository:
         mock_conn.cursor.return_value = mock_cur
         mock_cur.fetchone.return_value = (1, "alice", "hashed_pw")
 
-        with patch("db.user_repositories.get_connection", return_value=mock_conn):
+        with patch(USER_REPO, return_value=mock_conn):
             result = self.repo.get_user_by_username("alice")
 
         assert result == (1, "alice", "hashed_pw")
@@ -97,7 +94,7 @@ class TestUserRepository:
         mock_conn.cursor.return_value = mock_cur
         mock_cur.fetchone.return_value = None
 
-        with patch("db.user_repositories.get_connection", return_value=mock_conn):
+        with patch(USER_REPO, return_value=mock_conn):
             result = self.repo.get_user_by_username("ghost")
 
         assert result is None
@@ -107,10 +104,8 @@ class TestUserRepository:
 
 class TestGameRepository:
     def setup_method(self):
-        with patch("db.game_repository.get_connection"), \
-             patch("db.init_db.get_connection"):
-            from db.game_repository import GameRepository
-            self.repo = GameRepository()
+        from db.repositories.game_repository import GameRepository
+        self.repo = GameRepository()
 
     def _mock_conn(self):
         mock_conn = MagicMock()
@@ -118,24 +113,15 @@ class TestGameRepository:
         mock_conn.cursor.return_value = mock_cur
         return mock_conn, mock_cur
 
-    def test_create_game(self):
-        mock_conn, mock_cur = self._mock_conn()
-        mock_cur.fetchone.return_value = (42,)
-
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
-            game_id = self.repo.create_game(1, 2)
-
-        assert game_id == 42
-        mock_conn.commit.assert_called_once()
-
-    def test_create_open_game_returns_id_and_code(self):
+    def test_create_open_game_returns_board_id_and_code(self):
         mock_conn, mock_cur = self._mock_conn()
         mock_cur.fetchone.return_value = (10,)
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn), \
-             patch("db.game_repository.random.choice", return_value=True):
-            game_id, code = self.repo.create_open_game(1)
+        with patch(GAME_REPO, return_value=mock_conn), \
+             patch("db.repositories.game_repository.random.choice", return_value=True):
+            board, game_id, code = self.repo.create_open_game(1)
 
+        assert board is not None
         assert game_id == 10
         assert isinstance(code, str)
         assert len(code) == 8
@@ -145,8 +131,8 @@ class TestGameRepository:
         mock_conn, mock_cur = self._mock_conn()
         mock_cur.fetchone.return_value = (1,)
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn), \
-             patch("db.game_repository.random.choice", return_value=True):
+        with patch(GAME_REPO, return_value=mock_conn), \
+             patch("db.repositories.game_repository.random.choice", return_value=True):
             self.repo.create_open_game(99)
 
         args = mock_cur.execute.call_args[0][1]
@@ -157,8 +143,8 @@ class TestGameRepository:
         mock_conn, mock_cur = self._mock_conn()
         mock_cur.fetchone.return_value = (1,)
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn), \
-             patch("db.game_repository.random.choice", return_value=False):
+        with patch(GAME_REPO, return_value=mock_conn), \
+             patch("db.repositories.game_repository.random.choice", return_value=False):
             self.repo.create_open_game(99)
 
         args = mock_cur.execute.call_args[0][1]
@@ -168,7 +154,7 @@ class TestGameRepository:
     def test_create_private_room_returns_code(self):
         mock_conn, mock_cur = self._mock_conn()
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
+        with patch(GAME_REPO, return_value=mock_conn):
             code = self.repo.create_private_room(1)
 
         assert isinstance(code, str)
@@ -180,7 +166,7 @@ class TestGameRepository:
         # player_id=2 joins, white=1, black=2
         mock_cur.fetchone.return_value = (10, 1, 2)
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
+        with patch(GAME_REPO, return_value=mock_conn):
             result = self.repo.join_private_room("ABC123", 2)
 
         assert result is not None
@@ -194,7 +180,7 @@ class TestGameRepository:
         mock_conn, mock_cur = self._mock_conn()
         mock_cur.fetchone.return_value = None
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
+        with patch(GAME_REPO, return_value=mock_conn):
             result = self.repo.join_private_room("BADCODE", 2)
 
         assert result is None
@@ -203,7 +189,7 @@ class TestGameRepository:
         mock_conn, mock_cur = self._mock_conn()
         mock_cur.fetchone.return_value = (5, 3, None, "XY12AB34")
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
+        with patch(GAME_REPO, return_value=mock_conn):
             result = self.repo.get_free_lobby(99)
 
         assert result == (5, 3, None, "XY12AB34")
@@ -212,7 +198,7 @@ class TestGameRepository:
         mock_conn, mock_cur = self._mock_conn()
         mock_cur.fetchone.return_value = None
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
+        with patch(GAME_REPO, return_value=mock_conn):
             result = self.repo.get_free_lobby(99)
 
         assert result is None
@@ -221,27 +207,27 @@ class TestGameRepository:
         mock_conn, mock_cur = self._mock_conn()
         mock_cur.fetchone.return_value = (1, 2, "ABCD1234")
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
+        with patch(GAME_REPO, return_value=mock_conn):
             result = self.repo.join_lobby(5, 2)
 
         assert result == (1, 2, "ABCD1234")
         mock_conn.commit.assert_called_once()
 
-    def test_get_game_found(self):
+    def test_get_game_by_gameId_found(self):
         mock_conn, mock_cur = self._mock_conn()
-        mock_cur.fetchone.return_value = (1, "ABCD1234", 1, 2, "white", "active")
+        mock_cur.fetchone.return_value = (1, "ABCD1234", 1, 2, "active")
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
-            result = self.repo.get_game(1)
+        with patch(GAME_REPO, return_value=mock_conn):
+            result = self.repo.get_game_by_gameId(1)
 
-        assert result == (1, "ABCD1234", 1, 2, "white", "active")
+        assert result == (1, "ABCD1234", 1, 2, "active")
 
-    def test_get_game_not_found(self):
+    def test_get_game_by_gameId_not_found(self):
         mock_conn, mock_cur = self._mock_conn()
         mock_cur.fetchone.return_value = None
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
-            result = self.repo.get_game(999)
+        with patch(GAME_REPO, return_value=mock_conn):
+            result = self.repo.get_game_by_gameId(999)
 
         assert result is None
 
@@ -249,7 +235,7 @@ class TestGameRepository:
         mock_conn, mock_cur = self._mock_conn()
         mock_cur.fetchone.return_value = (1, "ABCD1234", 1, 2, "white", "active")
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
+        with patch(GAME_REPO, return_value=mock_conn):
             result = self.repo.get_game_by_code("ABCD1234")
 
         assert result == (1, "ABCD1234", 1, 2, "white", "active")
@@ -258,7 +244,72 @@ class TestGameRepository:
         mock_conn, mock_cur = self._mock_conn()
         mock_cur.fetchone.return_value = None
 
-        with patch("db.game_repository.get_connection", return_value=mock_conn):
+        with patch(GAME_REPO, return_value=mock_conn):
             result = self.repo.get_game_by_code("INVALID")
 
         assert result is None
+
+    def test_get_game_by_player_skips_finished_games(self):
+        mock_conn, mock_cur = self._mock_conn()
+        mock_cur.fetchone.return_value = None
+
+        with patch(GAME_REPO, return_value=mock_conn):
+            self.repo.get_game_by_player(5)
+
+        sql = mock_cur.execute.call_args[0][0]
+        assert "status IN ('waiting', 'private', 'active')" in sql
+
+    def test_get_pending_games_matches_only_half_empty_lobbies(self):
+        mock_conn, mock_cur = self._mock_conn()
+        mock_cur.fetchall.return_value = [(1, "CODE1234", 5, None, "waiting")]
+
+        with patch(GAME_REPO, return_value=mock_conn):
+            result = self.repo.get_pending_games_by_player(5)
+
+        sql, params = mock_cur.execute.call_args[0]
+        # A lobby only counts as pending while the other seat is still empty.
+        assert "white_player_id = %s AND black_player_id IS NULL" in sql
+        assert "black_player_id = %s AND white_player_id IS NULL" in sql
+        assert params == (5, 5)
+        assert result == [(1, "CODE1234", 5, None, "waiting")]
+
+    def test_get_pending_games_returns_every_stale_lobby(self):
+        mock_conn, mock_cur = self._mock_conn()
+        mock_cur.fetchall.return_value = [
+            (2, "CODE5678", None, 5, "waiting"),
+            (1, "CODE1234", 5, None, "waiting"),
+        ]
+
+        with patch(GAME_REPO, return_value=mock_conn):
+            result = self.repo.get_pending_games_by_player(5)
+
+        assert len(result) == 2
+
+    def test_get_pending_games_none(self):
+        mock_conn, mock_cur = self._mock_conn()
+        mock_cur.fetchall.return_value = []
+
+        with patch(GAME_REPO, return_value=mock_conn):
+            assert self.repo.get_pending_games_by_player(5) == []
+
+    def test_mark_finished_keeps_the_row(self):
+        mock_conn, mock_cur = self._mock_conn()
+
+        with patch(GAME_REPO, return_value=mock_conn):
+            self.repo.mark_finished(7)
+
+        sql, params = mock_cur.execute.call_args[0]
+        assert "UPDATE games SET status = 'finished'" in sql
+        assert params == (7,)
+        mock_conn.commit.assert_called_once()
+
+    def test_remove_game_deletes_the_row(self):
+        mock_conn, mock_cur = self._mock_conn()
+
+        with patch(GAME_REPO, return_value=mock_conn):
+            self.repo.remove_game(7)
+
+        sql, params = mock_cur.execute.call_args[0]
+        assert "DELETE FROM games" in sql
+        assert params == (7,)
+        mock_conn.commit.assert_called_once()

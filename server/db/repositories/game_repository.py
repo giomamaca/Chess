@@ -62,7 +62,7 @@ class GameRepository:
         return code
 
     def join_private_room(self, code: str, player_id: int):
-        """Join a private room by code. Returns (game_id, host_id, host_color) or None."""
+        """Join a private room by code. Returns (game_id, host_id, joining_color, host_color) or None."""
         conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
@@ -123,7 +123,6 @@ class GameRepository:
         conn.commit()
         cur.close()
         conn.close()
-        print("ipova")
         return result
 
     def get_game_by_gameId(self, game_id: int):
@@ -149,19 +148,57 @@ class GameRepository:
         cur.close()
         conn.close()
         return game
-    
-    def get_game_by_player(self, user_id : int):
+
+    def get_game_by_player(self, user_id: int):
+        """The player's most recent game that is still in progress.
+        Finished games are excluded so /online/board and /online/chat
+        never resurrect data from an old game."""
         conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
             SELECT id, code, white_player_id, black_player_id, status
-            FROM games WHERE white_player_id = %s OR black_player_id = %s
+            FROM games
+            WHERE (white_player_id = %s OR black_player_id = %s)
+              AND status IN ('waiting', 'private', 'active')
+            ORDER BY created_at DESC
+            LIMIT 1
         """, (user_id, user_id))
         game = cur.fetchone()
         cur.close()
         conn.close()
         return game
-    
+
+    def get_pending_games_by_player(self, user_id: int):
+        """The player's own lobbies that nobody has joined yet (quick match or
+        private). Returns a list so leftovers from earlier attempts get cleaned
+        up too."""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, code, white_player_id, black_player_id, status
+            FROM games
+            WHERE status IN ('waiting', 'private')
+              AND ((white_player_id = %s AND black_player_id IS NULL)
+                OR (black_player_id = %s AND white_player_id IS NULL))
+            ORDER BY created_at DESC
+        """, (user_id, user_id))
+        games = cur.fetchall()
+        cur.close()
+        conn.close()
+        return games
+
+    def mark_finished(self, game_id: int):
+        """Mark a game as finished (checkmate/stalemate). Keeps the row —
+        and its chat history — but removes it from active-game lookups."""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE games SET status = 'finished' WHERE id = %s
+        """, (game_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+
     def remove_game(self, game_id: int):
         conn = get_connection()
         cur = conn.cursor()
@@ -171,9 +208,8 @@ class GameRepository:
         conn.commit()
         cur.close()
         conn.close()
-    
+
     def get_player_color(self, user_id: int, game):
         if game[2] == user_id:
             return "white"
         return "black"
-        
